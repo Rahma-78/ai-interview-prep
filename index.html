@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Prep - Test Frontend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; }
+        input[type="file"] { margin-bottom: 10px; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .results { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+        .skill-section { margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; }
+        .skill-section h3 { margin-top: 0; color: #007bff; }
+        ul { list-style-type: disc; margin-left: 20px; }
+        .error { color: red; font-weight: bold; }
+        .loading { color: #007bff; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Interview Prep - Test Frontend</h1>
+        <p>Upload your resume (PDF, DOCX, TXT) to generate interview questions.</p>
+        
+        <input type="file" id="resumeFile" accept=".pdf,.docx,.txt">
+        <button onclick="uploadResume()">Generate Questions</button>
+        
+        <div id="status" class="loading"></div>
+        <div id="error" class="error"></div>
+        
+        <div id="results" class="results">
+            <!-- Results will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://localhost:8000"; // FastAPI backend URL
+
+        async function uploadResume() {
+            const fileInput = document.getElementById('resumeFile');
+            const statusDiv = document.getElementById('status');
+            const errorDiv = document.getElementById('error');
+            const resultsDiv = document.getElementById('results');
+
+            statusDiv.textContent = '';
+            errorDiv.textContent = '';
+            resultsDiv.innerHTML = '';
+
+            if (fileInput.files.length === 0) {
+                errorDiv.textContent = "Please select a resume file.";
+                return;
+            }
+
+            const file = fileInput.files;
+            const formData = new FormData();
+            formData.append("resume_file", file);
+
+            statusDiv.textContent = "Processing resume and generating questions...";
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/generate-questions/`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                statusDiv.textContent = "Questions generated successfully!";
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                errorDiv.textContent = `Error: ${error.message}`;
+                statusDiv.textContent = '';
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<p>No questions could be generated for the provided resume.</p>';
+                return;
+            }
+
+            data.forEach(item => {
+                const skillSection = document.createElement('div');
+                skillSection.className = 'skill-section';
+                
+                const skillHeader = document.createElement('h3');
+                skillHeader.textContent = `Skill: ${item.skill}`;
+                skillSection.appendChild(skillHeader);
+
+                if (item.error) {
+                    const errorP = document.createElement('p');
+                    errorP.className = 'error';
+                    errorP.textContent = `Error processing skill: ${item.error}`;
+                    skillSection.appendChild(errorP);
+                } else if (item.questions && item.questions.length > 0) {
+                    const questionsList = document.createElement('ul');
+                    item.questions.forEach(q => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = q;
+                        questionsList.appendChild(listItem);
+                    });
+                    skillSection.appendChild(questionsList);
+                } else {
+                    const noQuestionsP = document('p');
+                    noQuestionsP.textContent = 'No questions generated for this skill.';
+                    skillSection.appendChild(noQuestionsP);
+                }
+                resultsDiv.appendChild(skillSection);
+            });
+        }
+    </script>
+</body>
+</html>

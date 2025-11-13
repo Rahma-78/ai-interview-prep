@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrewAI Test UI</title>
+    <style>
+        body { font-family: sans-serif; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CrewAI Test UI</h1>
+        <form id="upload-form">
+            <input type="file" id="resume" name="resume" accept=".pdf,.docx,.txt">
+            <button type="submit">Generate Questions</button>
+        </form>
+        <div id="results" class="hidden">
+            <h2>Generated Questions</h2>
+            <pre id="questions"></pre>
+        </div>
+        <hr>
+        <h2>Agent Tests</h2>
+        <button id="run-tests">Run Agent Tests</button>
+        <div id="test-results" class="hidden">
+            <h3>Test Results</h3>
+            <pre id="test-output"></pre>
+        </div>
+    </div>
+    <script>
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('resume_file', document.getElementById('resume').files[0]);
+            const response = await fetch('/generate-questions/', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            document.getElementById('questions').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('results').classList.remove('hidden');
+        });
+
+        document.getElementById('run-tests').addEventListener('click', async () => {
+            const response = await fetch('/run-tests/');
+            const data = await response.json();
+            document.getElementById('test-output').textContent = data.output;
+            document.getElementById('test-results').classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
