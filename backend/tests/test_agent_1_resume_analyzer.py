@@ -9,6 +9,7 @@ import sys
 import asyncio
 import time
 from pathlib import Path
+import ast # Import the ast module
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -17,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from crewai import Crew, Process
 from backend.agents import InterviewPrepAgents
 from backend.tasks import InterviewPrepTasks
-from backend.tools import file_text_extractor
-
+from backend.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
+from backend.schemas import ExtractedSkills
 async def test_agent_1_resume_analyzer(resume_file_path: str):
     """
     Test Agent 1 functionality (Resume Analyzer) using async CrewAI implementation.
@@ -32,20 +33,30 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
     """
     
     if not os.path.exists(resume_file_path):
-        print(f"Error: Resume file not found at {resume_file_path}")
+        # Error message for missing file, kept as a comment for debugging if needed
+        # print(f"Error: Resume file not found at {resume_file_path}")
         return None
     
-    print(f"\n{'='*60}")
-    print(f"Testing Agent 1: Resume Analyzer (Async CrewAI)")
-    print(f"Resume file: {resume_file_path}")
-    print(f"{'='*60}\n")
+    # Removed verbose print statements for cleaner output
+    # print(f"\n{'='*60}")
+    # print(f"Testing Agent 1: Resume Analyzer (Async CrewAI)")
+    # print(f"Resume file: {resume_file_path}")
+    # print(f"{'='*60}\n")
     
     start_time = time.time()
     
     try:
         # Create Agent 1 using CrewAI with async execution
         agents = InterviewPrepAgents()
-        agent_1 = agents.resume_analyzer_agent()
+        
+        # Define tools for the agent
+        tools_dict = {
+            "file_text_extractor": file_text_extractor,
+            "google_search_tool": google_search_tool,
+            "smart_web_content_extractor": smart_web_content_extractor,
+            "question_generator": question_generator
+        }
+        agent_1 = agents.resume_analyzer_agent(tools_dict)
         
         # Create tasks for Agent 1
         tasks = InterviewPrepTasks()
@@ -53,15 +64,15 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         
         # Create a crew with just Agent 1 (following the same pattern as other agent tests)
         mini_crew = Crew(
-            agents=[agent_1],
-            tasks=[skills_task],
+            agents=[agent_1],#
+            tasks=[skills_task],#
             process=Process.sequential,
             verbose=True,
-            max_rpm=30
+            # max_rpm=30 # Removed for consistency with crew/crew.py
         )
         
         # Run the crew asynchronously
-        print("[Step 1] Running Async CrewAI for resume analysis...")
+        # print("[Step 1] Running Async CrewAI for resume analysis...") # Removed print
         crew_start = time.time()
         result = await mini_crew.kickoff_async()
         crew_time = time.time() - crew_start
@@ -69,28 +80,39 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         skills_list = []
         result_data = {}
         
-        print(f"Raw result type: {type(result)}")
-        print(f"Raw result: {result}")
+        # print(f"Raw result type: {type(result)}") # Removed print
+        # print(f"Raw result: {result}") # Removed print
 
         try:
-            if isinstance(result, dict):
-                result_data = result
-            elif isinstance(result, str):
-                # Assuming LLM is instructed to return JSON, try to parse it
-                result_data = json.loads(result)
-            
-            skills_list = result_data.get("skills", [])
+            # Initialize processed_result with the raw result string
+            processed_result = str(result).strip()
+
+            # If it starts with a single quote or looks like a Python dict, convert it
+            if processed_result.startswith("{") and "'" in processed_result:
+                try:
+                    # Safely evaluate as a Python literal (dictionary)
+                    dict_result = ast.literal_eval(processed_result)
+                    # Convert the dictionary to a proper JSON string
+                    processed_result = json.dumps(dict_result)
+                except (ValueError, SyntaxError) as e:
+                    # print(f"Warning: Could not evaluate result as Python literal: {e}") # Removed print
+                    # If literal_eval fails, processed_result remains its original string value
+                    pass
+
+            # The result from kickoff_async should be a JSON string representing ExtractedSkills
+            parsed_result = ExtractedSkills(**json.loads(processed_result))
+            skills_list = parsed_result.skills
             
         except json.JSONDecodeError as e:
-            print(f"Warning: Could not parse result as JSON: {e}")
-            print(f"Raw result string: {result}")
+            # print(f"Warning: Could not parse result as JSON: {e}") # Removed print
+            # print(f"Raw result string: {processed_result}") # Removed print
             return {
                 "skills": [],
                 "extraction_time": time.time() - start_time,
-                "error": "Failed to parse CrewAI result as JSON"
+                "error": f"Failed to parse CrewAI result as JSON: {e}"
             }
         except Exception as e:
-            print(f"Error processing result: {e}")
+            # print(f"Error processing result: {e}") # Removed print
             import traceback
             traceback.print_exc()
             return {
@@ -101,19 +123,19 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         
         extraction_time = time.time() - start_time
         
-        print(f"SUCCESS: Extracted {len(skills_list)} skills using CrewAI")
-        for idx, skill in enumerate(skills_list, 1):
-            print(f"   {idx}. {skill}")
+        # print(f"SUCCESS: Extracted {len(skills_list)} skills using CrewAI") # Removed print
+        # for idx, skill in enumerate(skills_list, 1): # Removed print
+        #     print(f"   {idx}. {skill}") # Removed print
         
         # Save skills to JSON file
-        output_path = "tests/extracted_skills.json"
+        output_path = "backend/tests/extracted_skills.json" # Updated path
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump({"skills": skills_list}, f, indent=2, ensure_ascii=False)
-        print(f"\nSkills saved to: {output_path}")
+        # print(f"\nSkills saved to: {output_path}") # Removed print
         
-        print(f"\n{'='*60}")
-        print(f"Agent 1 Resume Analyzer Test Complete")
-        print(f"{'='*60}\n")
+        # print(f"\n{'='*60}") # Removed print
+        # print(f"Agent 1 Resume Analyzer Test Complete") # Removed print
+        # print(f"{'='*60}\n") # Removed print
         
         # Return data matching crew format
         return {
@@ -126,7 +148,7 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         }
                 
     except Exception as e:
-        print(f"Error in Agent 1 test (outer block): {e}")
+        # print(f"Error in Agent 1 test (outer block): {e}") # Removed print
         import traceback
         traceback.print_exc()
         return {
@@ -142,26 +164,27 @@ if __name__ == "__main__":
     # You can modify this to accept command line arguments
     
     # For testing, create a sample resume file if it doesn't exist
-    sample_resume_path =   "backend/Rahma Ashraf AlShafi'i.pdf"
+    sample_resume_path =   str(Path(__file__).parent.parent / "Rahma Ashraf AlShafi'i.pdf")
+    # print(f"DEBUG: Resolved resume path: {sample_resume_path}") # Removed print
     
     if not os.path.exists(sample_resume_path):
-        print(f"Error: Resume file not found at {sample_resume_path}")
-        print("Please ensure the resume file exists before running the test.")
+        # print(f"Error: Resume file not found at {sample_resume_path}") # Removed print
+        # print("Please ensure the resume file exists before running the test.") # Removed print
         exit(1)
     
     # Run Agent 1 test
-    print("\n" + "="*60)
-    print("RUNNING AGENT 1: RESUME ANALYZER TEST")
-    print("="*60 + "\n")
+    # print("\n" + "="*60) # Removed print
+    # print("RUNNING AGENT 1: RESUME ANALYZER TEST") # Removed print
+    # print("="*60 + "\n") # Removed print
     
     # Test Agent 1 functionality
-    print("Testing Agent 1 Resume Analyzer...")
+    # print("Testing Agent 1 Resume Analyzer...") # Removed print
     direct_result = asyncio.run(test_agent_1_resume_analyzer(sample_resume_path))
     
     # Show results
-    print("\n" + "="*60)
-    print("AGENT 1 RESUME ANALYZER RESULTS")
-    print("="*60)
+    # print("\n" + "="*60) # Removed print
+    # print("AGENT 1 RESUME ANALYZER RESULTS") # Removed print
+    # print("="*60) # Removed print
     
     if direct_result:
         skills_list = direct_result.get("skills", [])
@@ -171,20 +194,20 @@ if __name__ == "__main__":
         success = direct_result.get("success", False)
         error = direct_result.get("error", None)
         
-        print(f"Method: CrewAI (Agent 1)")
-        print(f"Success: {success}")
-        if error:
-            print(f"Error: {error}")
-        print(f"Skills found: {len(skills_list)}")
-        print(f"Total extraction time: {extraction_time:.3f}s")
-        print(f"LLM call time: {llm_time:.3f}s")
-        print(f"Text extraction time: {text_extraction_time:.3f}s")
-        print(f"Output file: {direct_result.get('output_file', 'N/A')}")
+        # print(f"Method: CrewAI (Agent 1)") # Removed print
+        # print(f"Success: {success}") # Removed print
+        # if error: # Removed print
+        #     print(f"Error: {error}") # Removed print
+        # print(f"Skills found: {len(skills_list)}") # Removed print
+        # print(f"Total extraction time: {extraction_time:.3f}s") # Removed print
+        # print(f"LLM call time: {llm_time:.3f}s") # Removed print
+        # print(f"Text extraction time: {text_extraction_time:.3f}s") # Removed print
+        # print(f"Output file: {direct_result.get('output_file', 'N/A')}") # Removed print
         
-        print(f"\nExtracted Skills:")
-        for idx, skill in enumerate(skills_list, 1):
-            print(f"  {idx}. {skill}")
+        # print(f"\nExtracted Skills:") # Removed print
+        # for idx, skill in enumerate(skills_list, 1): # Removed print
+        #     print(f"  {idx}. {skill}") # Removed print
     
-    print("\n" + "="*60)
-    print("AGENT 1 RESUME ANALYZER TEST COMPLETE")
-    print("="*60 + "\n")
+    # print("\n" + "="*60) # Removed print
+    # print("AGENT 1 RESUME ANALYZER TEST COMPLETE") # Removed print
+    # print("="*60 + "\n") # Removed print

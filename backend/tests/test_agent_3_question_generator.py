@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Dict, List
 
 # CrewAI telemetry is now enabled for testing
 # os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
@@ -17,10 +18,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from crewai import Crew, Process
 from backend.agents import InterviewPrepAgents
 from backend.tasks import InterviewPrepTasks
-from backend.tools import question_generator
+from backend.tools import question_generator, smart_web_content_extractor
+from backend.schemas import AllInterviewQuestions, AllSkillSources, Source, SkillSources
 
 
-def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2: dict):
+def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2: Dict[str, List[str]]):
     """
     Test the Question Generator Agent independently.
     Uses skills and sources from Agents 1 and 2 as input.
@@ -64,19 +66,41 @@ def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2:
         print(f"\n[Processing Skill] {skill}")
         print("-" * 60)
         
-        # Get the source content for this skill from Agent 2 output
-        sources_content = sources_from_agent2.get(skill, {}).get("full_content", "")
+        # Get the list of URIs for this skill from Agent 2 output
+        uris_for_skill = sources_from_agent2.get(skill, [])
         
-        if not sources_content:
-            print(f"  Warning: No source content found for skill: {skill}")
+        if not uris_for_skill:
+            print(f"  Warning: No URIs found for skill: {skill}")
             all_questions[skill] = {
                 "questions": [],
                 "status": "no_sources",
-                "error": "No source content available for question generation"
+                "error": "No URIs available for content extraction"
             }
             continue
         
-        print(f"  [Step 1] Generating questions for skill: {skill}")
+        # Create a dummy AllSkillSources object to pass to smart_web_content_extractor
+        # This simulates the output of the search_sources_task
+        skill_sources_obj = AllSkillSources(all_sources=[
+            SkillSources(
+                skill=skill,
+                sources=[Source(uri=uri, title=f"Source for {skill}") for uri in uris_for_skill]
+            )
+        ])
+        
+        # Extract content using the smart_web_content_extractor tool
+        print(f"  [Step 1] Extracting web content for skill: {skill} from {len(uris_for_skill)} URIs...")
+        sources_content = smart_web_content_extractor(search_query=skill, urls=skill_sources_obj.json())
+        
+        if "Could not extract content" in sources_content or not sources_content:
+            print(f"  Warning: Could not extract relevant content for skill: {skill}")
+            all_questions[skill] = {
+                "questions": [],
+                "status": "no_content",
+                "error": "Failed to extract content from sources"
+            }
+            continue
+            
+        print(f"  [Step 2] Generating questions for skill: {skill}")
         print(f"  Source content length: {len(sources_content)} characters")
         
         # Create the question generation task
@@ -94,12 +118,17 @@ def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2:
         )
         
         question_result = question_crew.kickoff()  # type: ignore
-        print(f"  [Step 1 Complete] Questions generated")
+        print(f"  [Step 2 Complete] Questions generated")
         
-        # Parse questions
+        # Parse questions from AllInterviewQuestions schema
         try:
-            questions_data = json.loads(str(question_result))
-            questions_list = questions_data.get("questions", [])
+            parsed_result = AllInterviewQuestions(**json.loads(str(question_result)))
+            questions_list = []
+            for item in parsed_result.all_questions:
+                if item.skill.lower() == skill.lower():
+                    questions_list = item.questions
+                    break
+            
             print(f"  Generated {len(questions_list)} questions")
             for idx, question in enumerate(questions_list[:3], 1):  # Show first 3 questions
                 print(f"    {idx}. {question[:80]}..." if len(question) > 80 else f"    {idx}. {question}")
@@ -108,8 +137,8 @@ def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2:
                 "questions": questions_list,
                 "status": "success"
             }
-        except json.JSONDecodeError as e:
-            print(f"  Warning: Could not parse questions as JSON: {e}")
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"  Warning: Could not parse questions as AllInterviewQuestions JSON: {e}")
             print(f"  Raw result: {question_result}")
             all_questions[skill] = {
                 "questions": [],
@@ -182,9 +211,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     with open(agent2_output_path_full, "r", encoding="utf-8") as f:
-        agent2_result = json.load(f)
-    
-    sources = agent2_result.get("skills_with_resources", {})
+        sources = json.load(f) # This file now directly contains skill: [list of uris]
     
     if not sources:
         print("Warning: No sources found in Agent 2 output")

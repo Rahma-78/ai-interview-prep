@@ -13,6 +13,7 @@ backend/
 ├── __init__.py            # Package initialization
 ├── requirements.txt       # Dependencies
 ├── .env                   # Environment variables
+├── schemas.py             # Pydantic data models for API and internal data structures
 │
 ├── agents/                # AI Agent definitions
 │   ├── __init__.py       # Exports InterviewPrepAgents

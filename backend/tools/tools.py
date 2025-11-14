@@ -10,6 +10,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 import PyPDF2
+from backend.schemas import AllSkillSources, AllInterviewQuestions, Source, InterviewQuestions
 
 load_dotenv()
 
@@ -104,22 +105,29 @@ llm_openrouter = get_llm(
 @tool
 def file_text_extractor(file_path: str) -> str:
     """Extracts all text content from a PDF file. Returns the extracted text."""
+    print(f"DEBUG: file_text_extractor received file_path: {file_path}")
     try:
         # Check if it's a PDF file
         _, file_extension = os.path.splitext(file_path)
         file_extension = file_extension.lower()
         
         if file_extension != ".pdf":
+            print(f"DEBUG: Unsupported file type: {file_extension}")
             return f"Unsupported file type: {file_extension}. Only PDF files are supported."
         
         # Extract PDF content
         with open(file_path, 'rb') as file:
             reader = PyPDF2.PdfReader(file)
             text = "".join(page.extract_text() for page in reader.pages)
+            print(f"DEBUG: Extracted text length: {len(text)}")
             return text if text else "Error: No text could be extracted from the PDF."
     except FileNotFoundError:
+        print(f"DEBUG: FileNotFoundError in file_text_extractor for path: {file_path}")
         return f"Error: The file at {file_path} was not found."
     except Exception as e:
+        print(f"DEBUG: An unexpected error occurred in file_text_extractor: {e}")
+        import traceback
+        traceback.print_exc()
         return f"An error occurred while reading the PDF: {e}"
 
 
@@ -161,11 +169,22 @@ def google_search_tool(search_query: str) -> str:
             print(f"DEBUG: Search result type: {type(result)}")
             print(f"DEBUG: Search result (first 500 chars): {str(result)[:500] if result else 'None'}")
             
+            # Parse and reformat the result to match AllSkillSources schema
+            parsed_serper_result = json.loads(result_str)
+            
+            skill_sources = []
+            if "organic" in parsed_serper_result:
+                for item in parsed_serper_result["organic"]:
+                    if "link" in item and "title" in item:
+                        skill_sources.append(Source(uri=item["link"], title=item["title"]).dict())
+            
+            formatted_result = AllSkillSources(all_sources=[{"skill": search_query, "sources": skill_sources}]).json()
+            
             # Cache successful results
-            SEARCH_CACHE[cache_key] = result_str
+            SEARCH_CACHE[cache_key] = formatted_result
             search_rate_limiter.record_request()
             
-            return result_str
+            return formatted_result
             
         except Exception as e:
             error_msg = str(e)
@@ -226,22 +245,15 @@ def _generate_fallback_results(search_query: str) -> str:
     """Generate fallback results when API is exhausted"""
     print(f"📌 Generating fallback results for '{search_query}'...")
     
-    fallback_data = {
-        "searchResults": [
-            {
-                "title": f"Information about {search_query}",
-                "link": f"https://en.wikipedia.org/wiki/{search_query.replace(' ', '_')}",
-                "snippet": f"Wikipedia article about {search_query}. This is a fallback when search quota is exhausted."
-            },
-            {
-                "title": f"Learn {search_query}",
-                "link": f"https://www.tutorialspoint.com/tutoriallist.htm?keyword={search_query.replace(' ', '_')}",
-                "snippet": f"TutorialsPoint tutorials on {search_query}. Available when search is unavailable."
-            }
-        ]
-    }
+    # Fallback should also conform to AllSkillSources schema
+    fallback_sources = [
+        Source(uri=f"https://en.wikipedia.org/wiki/{search_query.replace(' ', '_')}", title=f"Wikipedia: {search_query}").dict(),
+        Source(uri=f"https://www.tutorialspoint.com/tutoriallist.htm?keyword={search_query.replace(' ', '_')}", title=f"TutorialsPoint: {search_query}").dict()
+    ]
     
-    return json.dumps(fallback_data)
+    fallback_data = AllSkillSources(all_sources=[{"skill": search_query, "sources": fallback_sources}]).json()
+    
+    return fallback_data
 
 
 @tool
@@ -260,46 +272,35 @@ def smart_web_content_extractor(search_query: str, urls: Optional[List[str]] = N
     if urls is None or not urls:
         return "No URLs provided for content extraction."
     
-    # Ensure urls is always a list
-    urls_list: List[str] = []
-    if not isinstance(urls, list):
-        # Try to parse if it's a JSON string
-        try:
-            parsed_urls = json.loads(str(urls))
-            if isinstance(parsed_urls, dict) and 'links' in parsed_urls:
-                urls_list = parsed_urls['links']
-            elif isinstance(parsed_urls, dict) and 'link' in parsed_urls:
-                urls_list = [parsed_urls['link']]
-            elif isinstance(parsed_urls, list):
-                urls_list = parsed_urls
-            else:
-                urls_list = [str(parsed_urls)]
-        except json.JSONDecodeError:
-            urls_list = [str(urls)]
-    else:
-        urls_list = urls
-    
+    # Parse the AllSkillSources JSON string
+    all_skill_sources: AllSkillSources
+    try:
+        parsed_data = json.loads(str(urls))
+        all_skill_sources = AllSkillSources(**parsed_data)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"Error parsing AllSkillSources in smart_web_content_extractor: {e}")
+        return f"Error: Invalid URL list format provided for content extraction: {e}"
+
+    urls_to_extract: List[str] = []
+    for skill_source_item in all_skill_sources.all_sources:
+        for source in skill_source_item.sources:
+            urls_to_extract.append(source.uri)
+            
     # Limit to 8 URLs max to avoid overwhelming the LLM
-    urls_list = urls_list[:8]
+    urls_to_extract = urls_to_extract[:8]
     
     combined_content = []
     successful_extractions = 0
     
-    print(f"📄 Extracting content from {len(urls_list)} URLs...")
+    print(f"📄 Extracting content from {len(urls_to_extract)} URLs...")
     
-    for idx, url in enumerate(urls_list, 1):
+    for idx, url in enumerate(urls_to_extract, 1):
         try:
-            # Handle dict entries
-            if isinstance(url, dict):
-                url = url.get('link') or url.get('url') or url.get('href')
-                if not url:
-                    continue
-            
             url = str(url).strip()
             if not url.startswith('http'):
                 continue
             
-            print(f"   [{idx}/{len(urls_list)}] Processing: {url[:60]}...")
+            print(f"   [{idx}/{len(urls_to_extract)}] Processing: {url[:60]}...")
             
             response = requests.get(url, timeout=15)
             response.raise_for_status()
@@ -340,16 +341,16 @@ def smart_web_content_extractor(search_query: str, urls: Optional[List[str]] = N
             print(f"      ✗ Error: {str(e)[:50]}")
     
     if not combined_content:
-        return f"⚠️  Could not extract content from {len(urls_list)} URLs. They may not contain relevant information about '{search_query}'."
+        return f"⚠️  Could not extract content from {len(urls_to_extract)} URLs. They may not contain relevant information about '{search_query}'."
     
     result = f"✓ Successfully extracted content from {successful_extractions} sources:\n\n" + "\n".join(combined_content)
-    print(f"\n✓ Extraction complete: {successful_extractions}/{len(urls_list)} sources processed")
+    print(f"\n✓ Extraction complete: {successful_extractions}/{len(urls_to_extract)} sources processed")
     
     return result
 
 @tool
 def question_generator(skill: str, sources_content: str) -> str:
-    """Generates insightful, non-coding interview questions based on provided skill and source content using OpenRouter. Returns a JSON string of questions."""
+    """Generates insightful, non-coding interview questions based on provided skill and source content using OpenRouter. Returns a JSON string of AllInterviewQuestions."""
     try:
         prompt = f"""Your task is to act as an expert technical interviewer.
         Based ONLY on the combined information from the Context provided below,
@@ -362,7 +363,16 @@ def question_generator(skill: str, sources_content: str) -> str:
         Do not include any text, explanation, or markdown formatting before or after the JSON object.
         The JSON object must have a single key "questions" which is an array of unique question strings.
         """
-        response = llm_openrouter.call(messages=[{"role": "user", "content": prompt}])
-        return str(response) if response else ""
+        llm_response = llm_openrouter.call(messages=[{"role": "user", "content": prompt}])
+        
+        # Parse the LLM response to extract questions
+        questions_data = json.loads(str(llm_response))
+        questions_list = questions_data.get("questions", [])
+        
+        # Format the output to match AllInterviewQuestions schema
+        interview_questions_obj = InterviewQuestions(skill=skill, questions=questions_list)
+        all_interview_questions = AllInterviewQuestions(all_questions=[interview_questions_obj])
+        
+        return all_interview_questions.json()
     except Exception as e:
         return f"Error generating questions: {e}"

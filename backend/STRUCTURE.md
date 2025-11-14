@@ -11,6 +11,7 @@ backend/
 ├── main.py                     # FastAPI application entry point
 ├── requirements.txt            # Python dependencies
 ├── .env                        # Environment variables
+├── schemas.py                  # Pydantic data models for API and internal data structures
 │
 ├── agents/                     # AI Agents module
 │   ├── __init__.py

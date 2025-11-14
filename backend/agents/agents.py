@@ -1,6 +1,7 @@
 from crewai import Agent
 from dotenv import load_dotenv
 from backend.tools import llm_groq, llm_openrouter, llm_gemini_flash
+from backend.schemas import ExtractedSkills, AllSkillSources, AllInterviewQuestions
 from typing import Generator, List, Dict, Any, Optional
 import asyncio
 import threading
@@ -25,7 +26,7 @@ class InterviewPrepAgents:
         self.llm_openrouter = llm_openrouter
         self.llm_gemini_flash = llm_gemini_flash
     
-    def resume_analyzer_agent(self, tools=None):
+    def resume_analyzer_agent(self, tools):
         return Agent(  # type: ignore
             role="Senior Technical Recruiter",
             goal="Analyze the content of a provided resume to identify the top 10 most relevant technical skills.",
@@ -35,14 +36,14 @@ class InterviewPrepAgents:
         "ignoring fluff and focusing on what matters for a technical role."
     ),
             llm=self.llm_groq,
-            tools=[tools["file_text_extractor"]] if tools else [],
+            tools=[tools["file_text_extractor"]],
             verbose=False,  # Reduce verbose output to improve performance
             allow_delegation=False,
             max_iter=3,  # Limit iterations to reduce latency
             max_rpm=30,  # Increase requests per minute for faster processing
             memory=False,  # Disable memory to reduce overhead
             cache=False,  # Disable caching for faster first call
-            response_format="json",  # Force JSON response for faster parsing
+            response_format=ExtractedSkills,  # Force JSON response for faster parsing
             max_tokens=1000,  # Limit tokens for faster response
             async_execution=True  # Enable async execution for better performance
         )
@@ -60,7 +61,8 @@ class InterviewPrepAgents:
             tools=[tools["google_search_tool"], tools["smart_web_content_extractor"]],
             verbose=True,
             allow_delegation=False,
-            async_execution=True  # Enable async execution for better performance
+            async_execution=True,  # Enable async execution for better performance
+            response_format=AllSkillSources # Enforce output format
         )
 
     def question_generator_agent(self, tools):
@@ -72,5 +74,6 @@ class InterviewPrepAgents:
             tools=[tools["question_generator"]], # This is now a function
             verbose=True,
             allow_delegation=False,
-            async_execution=True  # Enable async execution for better performance
+            async_execution=True,  # Enable async execution for better performance
+            response_format=AllInterviewQuestions # Enforce output format
         )

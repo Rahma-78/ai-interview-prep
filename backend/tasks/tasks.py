@@ -1,5 +1,7 @@
 from crewai import Task
 import json
+from backend.schemas import ExtractedSkills, AllSkillSources, AllInterviewQuestions
+from typing import List, Dict, Any
 
 # Import tools directly from the backend module
 try:
@@ -43,14 +45,18 @@ class InterviewPrepTasks:
 
     def extract_skills_task(self, agent, file_path: str):
         return Task(  # type: ignore
-            description=(f"1. Utilize the 'File Text Extractor Tool' to extract text from: {file_path}. "
-                       "2. Objective: Analyze the extracted text to identify the 10 most important technical skills relevant to the role."
-                       "3.Criteria: Ignore any filler content and focus exclusively on skills pertinent to technical roles."
+            description=(f"1. Use the 'File Text Extractor Tool' to extract text from: {file_path}. "
+                       "2. Analyze the extracted text to identify the 10 most important technical skills relevant to the role. "
+                       "3. ignoring fluff and focusing on what matters for a technical role"
                        "4. Prioritize skills from technical sections. "
+                       "5. Your final answer MUST be a JSON object with a 'skills' key, containing exactly 10 specific, technical skill strings. "
+                       "DO NOT include any other text or explanation in your final answer, only the JSON."
                        ),
             agent=agent,
             tools=[file_text_extractor],  # type: ignore
-            expected_output="JSON object with 'skills' key containing 10 specific, technical skill strings relevant to the candidate's background."
+            expected_output="JSON object with 'skills' key containing 10 specific, technical skill strings relevant to the candidate's background.",
+            output_json=ExtractedSkills, # Enforce output format
+            output_file="backend/tests/extracted_skills.json" # Save output to file in the tests directory
         )
 
     def search_sources_task(self, agent, skill: str):
@@ -62,12 +68,13 @@ class InterviewPrepTasks:
                        f"Use the 'Google Search Tool' with this optimized query: '{optimized_query}'. "
                        "Search for authoritative sources like tutorials, educational websites, documentation, and interview question websites. "
                        "Focus on text-based content (articles, documentation, Q&A sites, blogs, guides). "
-                       "The output should be a JSON string containing a list of dictionaries, where each dictionary has a 'link' key with the URL. "
+                       "The output should be a JSON string containing a list of dictionaries, where each dictionary has a 'uri' key with the URL and a 'title' key with the page title. "
                        "Return ALL found URLs (up to 5-10 results for better coverage). "
                        "CRITICAL: Make only ONE search attempt. If the search returns no results, return an empty list. Do NOT try multiple search queries or variations.",
             agent=agent,
             tools=[google_search_tool],  # type: ignore
-            expected_output="A JSON string containing a list of dictionaries with 'link' keys, prioritizing high-quality, text-based, authoritative sources. If no results are found, return an empty list."
+            expected_output="A JSON string containing a list of dictionaries with 'uri' and 'title' keys, prioritizing high-quality, text-based, authoritative sources. If no results are found, return an empty list.",
+            output_json=AllSkillSources # Enforce output format
         )
 
     def extract_web_content_task(self, agent, urls_reference: str, skill: str):
@@ -86,6 +93,6 @@ class InterviewPrepTasks:
                        "Use the 'Question Generator Tool' to return only a JSON object with a single key 'questions' which is an array of unique question strings.",
             agent=agent,
             tools=[question_generator],  # type: ignore
-            expected_output="A JSON string with a 'questions' key, containing an array of unique interview question strings."
+            expected_output="A JSON string with a 'questions' key, containing an array of unique interview question strings.",
+            output_json=AllInterviewQuestions # Enforce output format
         )
-

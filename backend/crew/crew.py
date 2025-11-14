@@ -4,6 +4,7 @@ from backend.tools import file_text_extractor, google_search_tool, smart_web_con
 import json
 import asyncio
 import time
+from backend.schemas import AllInterviewQuestions
 
 class InterviewPrepCrew:
     def __init__(self, file_path: str):
@@ -45,33 +46,44 @@ class InterviewPrepCrew:
                 tasks=[skills_task, search_task, extract_task, question_task],
                 process=Process.sequential,
                 verbose=True,
-                max_rpm=30,
+                # max_rpm=30, # Removed as it might not be supported in this version
                 # Enable async mode for the crew
             )
             
             # Run the crew asynchronously
-            result = await full_crew.kickoff_async()
+            crew_result = await full_crew.kickoff_async()
             
-            # Parse the result
-            result_str = str(result)
+            # The result from kickoff_async should be the output of the last task (question_task)
+            # which is expected to be a JSON string representing AllInterviewQuestions
+            result_str = str(crew_result)
+            
             try:
+                # Attempt to parse the result as AllInterviewQuestions
                 result_data = json.loads(result_str)
-                skills = result_data.get("skills", [])
                 
-                # Format the result for the API
-                all_interview_questions = []
-                for skill in skills:
-                    all_interview_questions.append({"skill": skill, "questions": []})
+                # Validate against the schema
+                from backend.schemas import AllInterviewQuestions
+                parsed_result = AllInterviewQuestions(**result_data)
+                
+                formatted_results = []
+                for item in parsed_result.all_questions:
+                    formatted_results.append({
+                        "skill": item.skill,
+                        "questions": item.questions
+                    })
                 
                 total_time = time.time() - start_time
                 print(f"✅ CrewAI processing completed in {total_time:.3f}s")
-                print(f"   - Skills extracted: {len(skills)}")
+                print(f"   - Total skills with questions: {len(formatted_results)}")
                 
-                return all_interview_questions
+                return formatted_results
                 
             except json.JSONDecodeError as e:
-                print(f"Error parsing CrewAI result: {e}")
-                return [{"skill": "Unknown", "questions": [], "error": "Failed to parse CrewAI result"}]
+                print(f"Error parsing CrewAI result as JSON: {e}")
+                return [{"skill": "Unknown", "questions": [], "error": f"Failed to parse CrewAI result as JSON: {e}"}]
+            except Exception as e:
+                print(f"Error validating CrewAI result against schema: {e}")
+                return [{"skill": "Unknown", "questions": [], "error": f"Failed to validate CrewAI result: {e}"}]
             
         except Exception as e:
             print(f"Error in CrewAI async run: {e}")
@@ -91,6 +103,8 @@ class InterviewPrepCrew:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # If we're in a running async context, create a task
+                # This might not be ideal if run() is called from a non-async context
+                # and expects a direct result. For FastAPI, it's usually called from async.
                 return asyncio.create_task(self.run_async())
             else:
                 # If no loop is running, run it directly

@@ -17,6 +17,7 @@ from crewai import Crew, Process
 from backend.agents import InterviewPrepAgents
 from backend.tasks import InterviewPrepTasks
 from backend.tools import google_search_tool, smart_web_content_extractor
+from backend.schemas import AllSkillSources, Source
 
 
 # ============================================================================
@@ -95,59 +96,37 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
                 agents=[source_discoverer],
                 tasks=[search_task],
                 process=Process.sequential,
-                verbose=False
+                verbose=False,
+                # max_rpm=30 # Removed for consistency
             )
             
             search_result = search_crew.kickoff()
             
-            # Parse search results
-            # Parse search results
+            # Parse search results as AllSkillSources
             urls = []
             try:
-                search_data = json.loads(str(search_result))
-                print(f"DEBUG: Raw search result: {str(search_result)[:200]}...")  # Debug output
+                parsed_result = AllSkillSources(**json.loads(str(search_result)))
+                for skill_source_item in parsed_result.all_sources:
+                    if skill_source_item.skill.lower() == skill.lower():
+                        urls = [source.uri for source in skill_source_item.sources]
+                        break
                 
-                if isinstance(search_data, dict):
-                    # Handle different response formats
-                    if 'organic' in search_data and search_data['organic']:
-                        # SerperDevTool format
-                        urls = [item['link'] for item in search_data['organic'] if 'link' in item]
-                    elif 'searchResults' in search_data and search_data['searchResults']:
-                        # Custom format
-                        urls = [item['link'] for item in search_data['searchResults'] if 'link' in item]
-                    elif 'links' in search_data and isinstance(search_data['links'], list):
-                        # Direct links list
-                        urls = search_data['links']
-                    elif 'link' in search_data and isinstance(search_data['link'], str):
-                        # Single link
-                        urls = [search_data['link']]
-                    else:
-                        # Fallback: find any URLs in the response
-                        for key, value in search_data.items():
-                            if isinstance(value, str) and value.startswith('http'):
-                                urls.append(value)
-                elif isinstance(search_data, list):
-                    # Handle list of results
-                    for item in search_data:
-                        if isinstance(item, dict) and 'link' in item:
-                            urls.append(item['link'])
-                        elif isinstance(item, str) and item.startswith('http'):
-                            urls.append(item)
+                print(f"DEBUG: Extracted {len(urls)} URLs from search result for skill '{skill}'")
                 
-                print(f"DEBUG: Extracted {len(urls)} URLs from search result")  # Debug output
-                
-            except json.JSONDecodeError as e:
-                print(f"DEBUG: JSON decode error: {e}")  # Debug output
-                # Try to extract URLs from plain text response
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"DEBUG: Error parsing search result as AllSkillSources: {e}")
+                print(f"Raw search result string: {str(search_result)[:500]}...")
+                # Fallback: try to extract URLs from plain text response if parsing fails
                 import re
                 url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+'
                 urls = re.findall(url_pattern, str(search_result))
-                print(f"DEBUG: Found {len(urls)} URLs via regex fallback")  # Debug output
+                print(f"DEBUG: Found {len(urls)} URLs via regex fallback")
+            
             return skill, {
-                "urls": urls[:MAX_URLS_PER_SKILL],  # Increased limit for better coverage
+                "urls": urls[:MAX_URLS_PER_SKILL],
                 "source": "llm_search",
                 "status": "success" if urls else "no_urls",
-                "urls_found_count": len(urls)  # Track total found before limiting
+                "urls_found_count": len(urls)
             }
         
         except Exception as e:
