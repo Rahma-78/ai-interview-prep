@@ -21,33 +21,19 @@
             <h2>Generated Questions</h2>
             <pre id="questions"></pre>
         </div>
-        <hr>
-        <h2>Agent Tests</h2>
-        <button id="run-tests">Run Agent Tests</button>
-        <div id="test-results" class="hidden">
-            <h3>Test Results</h3>
-            <pre id="test-output"></pre>
-        </div>
     </div>
     <script>
         document.getElementById('upload-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData();
             formData.append('resume_file', document.getElementById('resume').files[0]);
-            const response = await fetch('/generate-questions/', {
+            const response = await fetch('/v1/generate-questions/', {
                 method: 'POST',
                 body: formData
             });
             const data = await response.json();
             document.getElementById('questions').textContent = JSON.stringify(data, null, 2);
             document.getElementById('results').classList.remove('hidden');
-        });
-
-        document.getElementById('run-tests').addEventListener('click', async () => {
-            const response = await fetch('/run-tests/');
-            const data = await response.json();
-            document.getElementById('test-output').textContent = data.output;
-            document.getElementById('test-results').classList.remove('hidden');
         });
     </script>
 </body>

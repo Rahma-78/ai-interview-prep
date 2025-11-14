@@ -1,23 +1,25 @@
+import asyncio
 import json
+import logging
 import os
 import sys
-from pathlib import Path
-from collections import defaultdict
 import time
-import asyncio
-from typing import Generator, Dict, List, Tuple
+from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Tuple
 
-# CrewAI telemetry is now enabled for testing
-# os.environ["CREWAI_TELEMETRY_OPT_OUT"] = "true"
+from crewai import Crew, Process
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from crewai import Crew, Process
-from backend.agents import InterviewPrepAgents
-from backend.tasks import InterviewPrepTasks
-from backend.tools import google_search_tool, smart_web_content_extractor
-from backend.schemas import AllSkillSources, Source
+from app.schemas.interview import AllSkillSources, Source
+from app.services.agents.agents import InterviewPrepAgents
+from app.services.tasks.tasks import InterviewPrepTasks
+from app.services.tools.tools import google_search_tool, smart_web_content_extractor
+
+# Configure logging for tests
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 # ============================================================================
@@ -59,10 +61,10 @@ def deduplicate_skills(skills: List[str]) -> tuple[List[str], Dict]:
             duplicates_found.append((skill, seen[skill_lower]))
     
     if duplicates_found:
-        print(f"\n🔍 Deduplication: {len(skills)} → {len(filtered)} skills")
-        print(f"   Removed {len(duplicates_found)} duplicates")
+        logging.info(f"\n🔍 Deduplication: {len(skills)} → {len(filtered)} skills")
+        logging.info(f"   Removed {len(duplicates_found)} duplicates")
         for dup, canonical in duplicates_found:
-            print(f"     '{dup}' → '{canonical}'")
+            logging.info(f"     '{dup}' → '{canonical}'")
     
     return filtered, {"duplicates_found": duplicates_found, "original_count": len(skills)}
 
@@ -84,25 +86,21 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
         Tuple of (skill, result_dict)
     """
     async with semaphore:
-        # Respect the delay before making the request
         if delay > 0:
-            print(f"   ⏳ Waiting {delay:.1f}s before searching '{skill}'...")
+            logging.info(f"   ⏳ Waiting {delay:.1f}s before searching '{skill}'...")
             await asyncio.sleep(delay)
         
         try:
-            # Run the search (blocking operation wrapped in async)
             search_task = tasks.search_sources_task(source_discoverer, skill)
             search_crew = Crew(
                 agents=[source_discoverer],
                 tasks=[search_task],
                 process=Process.sequential,
                 verbose=False,
-                # max_rpm=30 # Removed for consistency
             )
             
-            search_result = search_crew.kickoff()
+            search_result = await search_crew.kickoff_async()
             
-            # Parse search results as AllSkillSources
             urls = []
             try:
                 parsed_result = AllSkillSources(**json.loads(str(search_result)))
@@ -111,16 +109,15 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
                         urls = [source.uri for source in skill_source_item.sources]
                         break
                 
-                print(f"DEBUG: Extracted {len(urls)} URLs from search result for skill '{skill}'")
+                logging.debug(f"Extracted {len(urls)} URLs from search result for skill '{skill}'")
                 
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"DEBUG: Error parsing search result as AllSkillSources: {e}")
-                print(f"Raw search result string: {str(search_result)[:500]}...")
-                # Fallback: try to extract URLs from plain text response if parsing fails
+                logging.debug(f"Error parsing search result as AllSkillSources: {e}")
+                logging.debug(f"Raw search result string: {str(search_result)[:500]}...")
                 import re
                 url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+'
                 urls = re.findall(url_pattern, str(search_result))
-                print(f"DEBUG: Found {len(urls)} URLs via regex fallback")
+                logging.debug(f"Found {len(urls)} URLs via regex fallback")
             
             return skill, {
                 "urls": urls[:MAX_URLS_PER_SKILL],
@@ -130,7 +127,7 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
             }
         
         except Exception as e:
-            print(f"   ⚠️  Error searching '{skill}': {str(e)[:100]}")
+            logging.error(f"   ⚠️  Error searching '{skill}': {str(e)[:100]}", exc_info=True)
             return skill, {
                 "urls": [],
                 "source": "error",
@@ -143,7 +140,7 @@ async def process_skills_async(
     unique_skills: List[str],
     tasks,
     source_discoverer,
-    max_concurrent: int = 1  # Conservative: 1 at a time
+    max_concurrent: int = 1
 ) -> Dict[str, Dict]:
     """
     Async processor for skills using concurrency control with smart batching.
@@ -160,52 +157,45 @@ async def process_skills_async(
     semaphore = asyncio.Semaphore(max_concurrent)
     results = {}
     
-    # Process skills in small batches to avoid overwhelming the API
     batch_size = min(MAX_SKILLS_PER_RUN, len(unique_skills))
     
     for batch_start in range(0, len(unique_skills), batch_size):
         batch_end = min(batch_start + batch_size, len(unique_skills))
         batch = unique_skills[batch_start:batch_end]
         
-        print(f"\n📦 Processing batch {batch_start // batch_size + 1}")
-        print(f"   Skills {batch_start + 1}-{batch_end} of {len(unique_skills)}")
-        print(f"{'='*80}\n")
+        logging.info(f"\n📦 Processing batch {batch_start // batch_size + 1}")
+        logging.info(f"   Skills {batch_start + 1}-{batch_end} of {len(unique_skills)}")
+        logging.info(f"{'='*80}\n")
         
         tasks_list = []
         
-        # Queue tasks for this batch
         for idx, skill in enumerate(batch):
-            # Check cache first
             if skill in SEARCH_CACHE:
-                print(f"🔍 [{idx + 1}/{len(batch)}] Cache hit: {skill}")
+                logging.info(f"🔍 [{idx + 1}/{len(batch)}] Cache hit: {skill}")
                 results[skill] = SEARCH_CACHE[skill]
                 continue
             
-            print(f"🔍 [{idx + 1}/{len(batch)}] Queued: {skill}")
+            logging.info(f"🔍 [{idx + 1}/{len(batch)}] Queued: {skill}")
             
-            # Calculate delay to space out requests
             delay = REQUEST_DELAY_SECONDS * idx
             
-            # Queue async search for new skills
             task = async_search_skill(skill, tasks, source_discoverer, semaphore, delay)
             tasks_list.append(task)
         
-        # Process this batch's tasks
         if tasks_list:
-            print(f"\n⏳ Running {len(tasks_list)} searches with throttling...\n")
+            logging.info(f"\n⏳ Running {len(tasks_list)} searches with throttling...\n")
             
             for coro in asyncio.as_completed(tasks_list):
                 try:
                     skill, result = await coro
                     results[skill] = result
                     SEARCH_CACHE[skill] = result
-                    print(f"   ✓ Completed: {skill} - Found {len(result['urls'])} URLs")
+                    logging.info(f"   ✓ Completed: {skill} - Found {len(result['urls'])} URLs")
                 except Exception as e:
-                    print(f"   ✗ Error: {str(e)[:100]}")
+                    logging.error(f"   ✗ Error: {str(e)[:100]}", exc_info=True)
         
-        # Wait between batches to avoid quota exhaustion
         if batch_end < len(unique_skills):
-            print(f"\n⏳ Waiting {REQUEST_DELAY_SECONDS * len(batch)}s before next batch...\n")
+            logging.info(f"\n⏳ Waiting {REQUEST_DELAY_SECONDS * len(batch)}s before next batch...\n")
             await asyncio.sleep(REQUEST_DELAY_SECONDS * len(batch))
     
     return results
@@ -232,18 +222,16 @@ def test_source_discoverer_agent(skills_from_agent1: list):
     """
     
     if not skills_from_agent1 or len(skills_from_agent1) == 0:
-        print("Error: No skills provided from Agent 1")
+        logging.error("Error: No skills provided from Agent 1")
         return None
     
-    print(f"\n{'='*80}")
-    print(f"🚀 SOURCE DISCOVERER AGENT")
-    print(f"{'='*80}")
-    print(f"Input skills: {len(skills_from_agent1)}")
+    logging.info(f"\n{'='*80}")
+    logging.info(f"🚀 SOURCE DISCOVERER AGENT")
+    logging.info(f"{'='*80}")
+    logging.info(f"Input skills: {len(skills_from_agent1)}")
     
-    # STEP 1: Deduplicate skills from structured input
     unique_skills, dedup_info = deduplicate_skills(skills_from_agent1)
     
-    # Initialize agents and tools
     agents = InterviewPrepAgents()
     tasks = InterviewPrepTasks()
     
@@ -257,35 +245,31 @@ def test_source_discoverer_agent(skills_from_agent1: list):
     all_sources = {}
     cached_count = 0
     
-    print(f"\n{'='*80}")
-    print(f"SEARCHING FOR RESOURCES")
-    print(f"{'='*80}\n")
+    logging.info(f"\n{'='*80}")
+    logging.info(f"SEARCHING FOR RESOURCES")
+    logging.info(f"{'='*80}\n")
     
-    # STEP 2: Run async batch processing with rate limiting
     async_results = asyncio.run(
         process_skills_async(unique_skills, tasks, source_discoverer, max_concurrent=1)
     )
     all_sources.update(async_results)
     
-    # Calculate stats
     llm_searches = len([r for r in all_sources.values() if r.get('source') == 'llm_search'])
     cached_count = len([r for r in all_sources.values() if r.get('source') != 'llm_search'])
     
-    print(f"\n{'='*80}")
-    print(f"📊 PROCESSING COMPLETE")
-    print(f"{'='*80}")
-    print(f"  Input skills: {len(skills_from_agent1)}")
-    print(f"  Unique skills: {len(unique_skills)}")
-    print(f"  Duplicates removed: {dedup_info['original_count'] - len(unique_skills)}")
-    print(f"  ♻️  Cache hits: {cached_count}")
-    print(f"  🔍 New LLM searches: {llm_searches}")
+    logging.info(f"\n{'='*80}")
+    logging.info(f"📊 PROCESSING COMPLETE")
+    logging.info(f"{'='*80}")
+    logging.info(f"  Input skills: {len(skills_from_agent1)}")
+    logging.info(f"  Unique skills: {len(unique_skills)}")
+    logging.info(f"  Duplicates removed: {dedup_info['original_count'] - len(unique_skills)}")
+    logging.info(f"  ♻️  Cache hits: {cached_count}")
+    logging.info(f"  🔍 New LLM searches: {llm_searches}")
     
-    # Create clean output: skills with their URLs only
     clean_output = {}
     for skill, data in all_sources.items():
         clean_output[skill] = data.get("urls", [])
     
-    # Prepare comprehensive output with all required fields
     output_data = {
         "skills_with_resources": clean_output,
         "input_skills": skills_from_agent1,
@@ -299,45 +283,41 @@ def test_source_discoverer_agent(skills_from_agent1: list):
         "status": "success" if all_sources else "failed"
     }
     
-    # Only save skills with URLs to the output file
-    output_path = "backend/tests/discovered_sources.json"
+    output_path = "app/tests/discovered_sources.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(clean_output, f, indent=2, ensure_ascii=False)  # type: ignore
     
-    print(f"\n✅ Results saved to: {output_path}")
-    print(f"{'='*80}\n")
+    logging.info(f"\n✅ Results saved to: {output_path}")
+    logging.info(f"{'='*80}\n")
     
     return output_data
 
 
 if __name__ == "__main__":
-    if __name__ == "__main__":
-        # Load skills from Agent 1 output (using hybrid approach)
-        agent1_output_path = "backend/tests/extracted_skills.json"
-        
-        if not os.path.exists(agent1_output_path):
-            print(f"Error: Agent 1 output not found at {agent1_output_path}")
-            print("Please run test_agent_1_resume_analyzer.py first (using hybrid approach)")
-            sys.exit(1)
-        
-        with open(agent1_output_path, "r", encoding="utf-8") as f:
-            agent1_result = json.load(f)
-        
-        skills = agent1_result.get("skills", [])
-        
-        if not skills:
-            print("Error: No skills found in Agent 1 output")
-            sys.exit(1)
-        
-        # Run the test using hybrid approach (Agent 1: direct async, Agents 2&3: CrewAI)
-        result = test_source_discoverer_agent(skills)
-        
-        if result:
-            print("\nTest Results Summary (Hybrid Approach):")
-            print(json.dumps({
-                "input_skills": result["input_skills"],
-                "unique_skills": result["unique_skills"],
-                "duplicates_removed": result["duplicates_removed"],
-                "optimization_stats": result["optimization_stats"],
-                "status": result["status"]
-            }, indent=2))
+    agent1_output_path = "app/tests/extracted_skills.json"
+    
+    if not os.path.exists(agent1_output_path):
+        logging.error(f"Error: Agent 1 output not found at {agent1_output_path}")
+        logging.error("Please run test_agent_1_resume_analyzer.py first (using hybrid approach)")
+        sys.exit(1)
+    
+    with open(agent1_output_path, "r", encoding="utf-8") as f:
+        agent1_result = json.load(f)
+    
+    skills = agent1_result.get("skills", [])
+    
+    if not skills:
+        logging.error("Error: No skills found in Agent 1 output")
+        sys.exit(1)
+    
+    result = test_source_discoverer_agent(skills)
+    
+    if result:
+        logging.info("\nTest Results Summary (Hybrid Approach):")
+        logging.info(json.dumps({
+            "input_skills": result["input_skills"],
+            "unique_skills": result["unique_skills"],
+            "duplicates_removed": result["duplicates_removed"],
+            "optimization_stats": result["optimization_stats"],
+            "status": result["status"]
+        }, indent=2))

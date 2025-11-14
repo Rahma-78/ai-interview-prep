@@ -1,56 +1,36 @@
+import logging
+from typing import List
+
 from crewai import Task
-import json
-from app.schemas.interview import ExtractedSkills, AllSkillSources, AllInterviewQuestions
-from typing import List, Dict, Any
+from crewai.agent import Agent
 
-# Import tools directly from the backend module
-try:
-    from app.services.tools.tools import (
-        file_text_extractor,
-        google_search_tool,
-        smart_web_content_extractor,
-        question_generator
-    )
-    tools_available = True
-except ImportError as e:
-    print(f"Warning: Could not import tools: {e}")
-    tools_available = False
+from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills
 
-# Create placeholder tools if import fails
-if not tools_available:
-    from crewai.tools import tool
-    
-    @tool
-    def file_text_extractor(file_path: str) -> str:
-        """Extracts all text content from a PDF file. Returns the extracted text."""
-        return "PDF text extraction not available"
-    
-    @tool
-    def google_search_tool(search_query: str) -> str:
-        """Performs a Google search for a given query and returns relevant snippets and URLs."""
-        return '{"organic": []}'
-    
-    @tool
-    def smart_web_content_extractor(search_query: str, urls=None) -> str:
-        """Extracts relevant, contextual content from a list of URLs based on a specific query."""
-        return "No URLs provided for content extraction"
-    
-    @tool
-    def question_generator(skill: str, sources_content: str) -> str:
-        """Generates insightful, non-coding interview questions based on provided skill and source content."""
-        return '{"questions": []}'
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+from app.services.tools.tools import (
+    file_text_extractor,
+    google_search_tool,
+    smart_web_content_extractor,
+    question_generator,
+)
 
 
 class InterviewPrepTasks:
+    """
+    Manages and defines the various tasks for the interview preparation system.
+    Each task is assigned to a specific agent and has a clear description and expected output.
+    """
 
-    def extract_skills_task(self, agent, file_path: str):
+    def extract_skills_task(self, agent: Agent, file_path: str) -> Task:
+        """
+        Defines the task for extracting technical skills from a resume.
+        """
         return Task(  # type: ignore
-            description=(f"1. Use the 'File Text Extractor Tool' to extract text from: {file_path}. "
-                       "2. Analyze the extracted text to identify the 10 most important technical skills relevant to the role. "
-                       "3. ignoring fluff and focusing on what matters for a technical role"
-                       "4. Prioritize skills from technical sections. "
-                       "5. Your final answer MUST be a JSON object with a 'skills' key, containing exactly 10 specific, technical skill strings. "
-                       "DO NOT include any other text or explanation in your final answer, only the JSON."
+            description=(f"Extract 10 key technical skills from {file_path} using 'File Text Extractor'. "
+                       "Focus on technical sections, ignoring fluff. "
+                       "Output MUST be JSON: {{'skills': [list of 10 skill strings]}}."
                        ),
             agent=agent,
             tools=[file_text_extractor],  # type: ignore
@@ -59,8 +39,10 @@ class InterviewPrepTasks:
             output_file="app/tests/extracted_skills.json" # Save output to file in the tests directory
         )
 
-    def search_sources_task(self, agent, skill: str):
-        # Create optimized search query for higher quality results
+    def search_sources_task(self, agent: Agent, skill: str) -> Task:
+        """
+        Defines the task for searching high-quality web sources for a given skill.
+        """
         optimized_query = f"{skill} interview questions tutorial best practices -youtube -vimeo"
         
         return Task(  # type: ignore
@@ -77,7 +59,10 @@ class InterviewPrepTasks:
             output_json=AllSkillSources # Enforce output format
         )
 
-    def extract_web_content_task(self, agent, urls_reference: str, skill: str):
+    def extract_web_content_task(self, agent: Agent, urls_reference: str, skill: str) -> Task:
+        """
+        Defines the task for extracting relevant content from web pages.
+        """
         return Task(  # type: ignore
             description=f"Extract relevant, contextual content about '{skill}' from the provided list of URLs: {urls_reference}. "
                        f"Use the 'Smart Web Content Extractor Tool' to get the most useful information based on the query: '{skill}'.",
@@ -86,7 +71,10 @@ class InterviewPrepTasks:
             expected_output="A single string containing the combined, relevant textual content from all provided URLs."
         )
 
-    def generate_questions_task(self, agent, skill: str, sources_content: str):
+    def generate_questions_task(self, agent: Agent, skill: str, sources_content: str) -> Task:
+        """
+        Defines the task for generating interview questions based on extracted skills and source content.
+        """
         return Task(  # type: ignore
             description=f"Generate insightful, non-coding interview questions for a candidate skilled in '{skill}'. "
                        "Base the questions ONLY on the information from these sources:\n{sources_content}. "

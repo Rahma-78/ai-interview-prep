@@ -1,11 +1,18 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from typing import List, Dict, Any
+import asyncio
+import logging
 import os
 import shutil
-import json
-from app.services.crew.crew import InterviewPrepCrew
+import traceback
+from typing import List
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from app.api.deps import get_crew_instance  # Import the dependency
 from app.schemas.interview import InterviewQuestion
-from app.api.deps import get_crew_instance # Import the dependency
+from app.services.crew.crew import InterviewPrepCrew
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 interview_router = APIRouter()
 
@@ -14,24 +21,31 @@ async def generate_interview_questions(
     resume_file: UploadFile = File(...),
     crew: InterviewPrepCrew = Depends(get_crew_instance)
 ):
+    """
+    Generates interview questions based on an uploaded resume file.
+
+    Args:
+        resume_file (UploadFile): The resume file to process.
+        crew (InterviewPrepCrew): The CrewAI instance for generating questions.
+
+    Returns:
+        List[InterviewQuestion]: A list of generated interview questions.
+
+    Raises:
+        HTTPException: If no resume file is provided or an error occurs during processing.
+    """
     if not resume_file.filename:
+        logging.error("No resume file provided.")
         raise HTTPException(status_code=400, detail="No resume file provided.")
 
-    # Save the uploaded file temporarily
     file_location = f"temp_{resume_file.filename}"
-    # The crew instance is now provided by dependency injection
     try:
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(resume_file.file, buffer)
+        # Use asyncio.to_thread for blocking I/O operations
+        await asyncio.to_thread(shutil.copyfileobj, resume_file.file, open(file_location, "wb"))
         
-        # Set the file_path on the injected crew instance
         crew.file_path = file_location
         
-        # Run the crew with CrewAI async processing (async execution enabled at agent and crew level)
         result = await crew.run_async()
-
-        # The result from crew.run() is expected to be a list of dictionaries
-        # like [{"skill": "Python", "questions": ["Q1", "Q2"]}]
         
         formatted_results: List[InterviewQuestion] = []
         for item in result:
@@ -40,12 +54,11 @@ async def generate_interview_questions(
                     InterviewQuestion(
                         skill=item["skill"],
                         questions=item["questions"],
-                        isLoading=False # Processing is complete
+                        isLoading=False
                     )
                 )
             else:
-                # Handle cases where the crew output might not be as expected
-                print(f"Unexpected item in crew result: {item}")
+                logging.warning(f"Unexpected item in crew result: {item}")
                 formatted_results.append(
                     InterviewQuestion(
                         skill="Unknown",
@@ -57,9 +70,9 @@ async def generate_interview_questions(
         return formatted_results
 
     except Exception as e:
+        logging.error(f"Error processing resume: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing resume: {e}")
     finally:
-        # Clean up the temporary file
         if os.path.exists(file_location):
             os.remove(file_location)
-        # The cleanup for the crew instance is handled by the dependency `get_crew_instance`
+            logging.info(f"Cleaned up temporary file: {file_location}")

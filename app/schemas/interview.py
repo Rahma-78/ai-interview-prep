@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List, Dict
 
 class InterviewQuestion(BaseModel):
     skill: str

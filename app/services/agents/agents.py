@@ -1,40 +1,40 @@
 from crewai import Agent
-from dotenv import load_dotenv
-from app.services.tools.tools import llm_groq, llm_openrouter, llm_gemini_flash
-from app.schemas.interview import ExtractedSkills, AllSkillSources, AllInterviewQuestions
-from typing import Generator, List, Dict, Any, Optional
-import asyncio
-import threading
-import time
-import os
-import json
-load_dotenv()
+from typing import Callable, Dict, List
 
+from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills
+from app.services.tools.tools import llm_gemini_flash, llm_groq, llm_openrouter
+from app.core.config import settings # Import settings
 
 # ============================================================================
 # SESSION CACHE FOR OPTIMIZATION
 # ============================================================================
 
-# Global cache for URL searches (persists during session)
-SEARCH_CACHE: Dict[str, Dict] = {}
-
-
 class InterviewPrepAgents:
+    """
+    Manages and defines the various agents used in the interview preparation system.
+    Each agent has a specific role, goal, and set of tools to accomplish its tasks.
+    """
+
     def __init__(self):
-        # Store LLM instances as class attributes to avoid circular imports
+        """
+        Initializes the InterviewPrepAgents with instances of the language models.
+        """
         self.llm_groq = llm_groq
         self.llm_openrouter = llm_openrouter
         self.llm_gemini_flash = llm_gemini_flash
-    
-    def resume_analyzer_agent(self, tools):
+
+    def resume_analyzer_agent(self, tools: Dict[str, Callable]) -> Agent:
+        """
+        Defines the agent responsible for analyzing resumes and extracting technical skills.
+        """
         return Agent(  # type: ignore
             role="Senior Technical Recruiter",
             goal="Analyze the content of a provided resume to identify the top 10 most relevant technical skills.",
             backstory=(
-        "You are an elite technical recruiter with over a decade of experience. "
-        "You have a masterful ability to scan any resume and extract the most relevant technical skills, "
-        "ignoring fluff and focusing on what matters for a technical role."
-    ),
+                "You are an elite technical recruiter with over a decade of experience. "
+                "You have a masterful ability to scan any resume and extract the most relevant technical skills, "
+                "ignoring fluff and focusing on what matters for a technical role."
+            ),
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
             verbose=False,  # Reduce verbose output to improve performance
@@ -48,32 +48,38 @@ class InterviewPrepAgents:
             async_execution=True  # Enable async execution for better performance
         )
 
-    def source_discoverer_agent(self, tools):
+    def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:
+        """
+        Defines the agent responsible for discovering authoritative web sources for technical skills.
+        """
         return Agent(  # type: ignore
             role='Expert Research Analyst',
             goal='Find the best text-based web pages with technical resources for specific skills using Google Search, explicitly avoiding video platforms and multimedia websites. Prioritize articles, tutorials, documentation, and Q&A sites with written content.',
             backstory=(
-        "You are a world-class digital researcher. Your goal is to provide the best source material for generating interview questions. "
-        "You will use your search capabilities to find famous question websites, high-quality tutorials, and expert articles for each skill. "
-        "You have a keen eye for identifying and filtering out video-based content (YouTube, Vimeo, TikTok, etc.) and only work with text-based resources."
-    ),
+                "You are a world-class digital researcher. Your goal is to provide the best source material for generating interview questions. "
+                "You will use your search capabilities to find famous question websites, high-quality tutorials, and expert articles for each skill. "
+                "You have a keen eye for identifying and filtering out video-based content (YouTube, Vimeo, TikTok, etc.) and only work with text-based resources."
+            ),
             llm=self.llm_gemini_flash,  # Use Gemini for grounding
             tools=[tools["google_search_tool"], tools["smart_web_content_extractor"]],
-            verbose=True,
+            verbose=settings.DEBUG_MODE,
             allow_delegation=False,
             async_execution=True,  # Enable async execution for better performance
-            response_format=AllSkillSources # Enforce output format
+            response_format=AllSkillSources  # Enforce output format
         )
 
-    def question_generator_agent(self, tools):
+    def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:
+        """
+        Defines the agent responsible for generating insightful interview questions.
+        """
         return Agent(  # type: ignore
             role='Question Generator',
             goal='Generate insightful, non-coding interview questions based on provided sources and skills.',
             backstory='An experienced technical interviewer who can craft challenging and relevant questions from given content.',
             llm=self.llm_openrouter,  # Use OpenRouter for question generation
-            tools=[tools["question_generator"]], # This is now a function
-            verbose=True,
+            tools=[tools["question_generator"]],  # This is now a function
+            verbose=settings.DEBUG_MODE,
             allow_delegation=False,
             async_execution=True,  # Enable async execution for better performance
-            response_format=AllInterviewQuestions # Enforce output format
+            response_format=AllInterviewQuestions  # Enforce output format
         )

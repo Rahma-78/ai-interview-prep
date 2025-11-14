@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     DEBUG_MODE: bool = False
 
     # API Keys (these would typically be loaded from .env)
-    GOOGLE_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    SERPER_API_KEY: str | None = None
     GROQ_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
+    CREWAI_TELEMETRY_OPT_OUT: bool = False
 
 settings = Settings()

@@ -16,9 +16,10 @@ def get_crew_instance() -> Generator[InterviewPrepCrew, None, None]:
         crew = InterviewPrepCrew(file_path="temp_resume.pdf") # Placeholder file_path
         yield crew
     finally:
-        # Cleanup if necessary
-        if crew:
-            crew.cleanup()
+        # No specific cleanup needed for InterviewPrepCrew at this time.
+        # If resources (e.g., temporary files) were managed by the crew itself,
+        # their cleanup would be handled internally by the crew's methods.
+        pass
 
 # Example of another dependency (if needed)
 # def get_current_user():
