@@ -66,61 +66,67 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         result = await mini_crew.kickoff_async()
         crew_time = time.time() - crew_start
         # Parse the result
-        result_str = str(result)
+        skills_list = []
+        result_data = {}
+        
+        print(f"Raw result type: {type(result)}")
+        print(f"Raw result: {result}")
+
         try:
-            # Remove JSON parsing to see what the actual result looks like
-            print(f"Raw result type: {type(result)}")
-            print(f"Raw result: {result}")
-            
-            # Try to handle result directly as it might already be a dict
             if isinstance(result, dict):
-                skills_list = result.get("skills", [])
-            else:
-                # If it's a string, try to parse it as JSON
-                try:
-                    result_data = json.loads(result_str)
-                    skills_list = result_data.get("skills", [])
-                except json.JSONDecodeError:
-                    print(f"Could not parse result as JSON: {result_str}")
-                    skills_list = []
+                result_data = result
+            elif isinstance(result, str):
+                # Assuming LLM is instructed to return JSON, try to parse it
+                result_data = json.loads(result)
             
-            extraction_time = time.time() - start_time
+            skills_list = result_data.get("skills", [])
             
-            print(f"SUCCESS: Extracted {len(skills_list)} skills using CrewAI")
-            for idx, skill in enumerate(skills_list, 1):
-                print(f"   {idx}. {skill}")
-            
-            # Save skills to JSON file
-            output_path = "tests/extracted_skills.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump({"skills": skills_list}, f, indent=2, ensure_ascii=False)
-            print(f"\nSkills saved to: {output_path}")
-            
-            print(f"\n{'='*60}")
-            print(f"Agent 1 Resume Analyzer Test Complete")
-            print(f"{'='*60}\n")
-            
-            # Return data matching crew format
-            return {
-                "skills": skills_list,
-                "output_file": output_path,
-                "extraction_time": extraction_time,
-                "crew_time": crew_time,
-                "method": "crewai",
-                "success": True
-            }
-                
         except json.JSONDecodeError as e:
-            print(f"Warning: Could not parse skills as JSON: {e}")
-            print(f"Raw result: {result_str}")
+            print(f"Warning: Could not parse result as JSON: {e}")
+            print(f"Raw result string: {result}")
             return {
                 "skills": [],
                 "extraction_time": time.time() - start_time,
-                "error": "Failed to parse CrewAI result"
+                "error": "Failed to parse CrewAI result as JSON"
             }
+        except Exception as e:
+            print(f"Error processing result: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "skills": [],
+                "extraction_time": time.time() - start_time,
+                "error": str(e)
+            }
+        
+        extraction_time = time.time() - start_time
+        
+        print(f"SUCCESS: Extracted {len(skills_list)} skills using CrewAI")
+        for idx, skill in enumerate(skills_list, 1):
+            print(f"   {idx}. {skill}")
+        
+        # Save skills to JSON file
+        output_path = "tests/extracted_skills.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump({"skills": skills_list}, f, indent=2, ensure_ascii=False)
+        print(f"\nSkills saved to: {output_path}")
+        
+        print(f"\n{'='*60}")
+        print(f"Agent 1 Resume Analyzer Test Complete")
+        print(f"{'='*60}\n")
+        
+        # Return data matching crew format
+        return {
+            "skills": skills_list,
+            "output_file": output_path,
+            "extraction_time": extraction_time,
+            "crew_time": crew_time,
+            "method": "crewai",
+            "success": True
+        }
                 
     except Exception as e:
-        print(f"Error in Agent 1 test: {e}")
+        print(f"Error in Agent 1 test (outer block): {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -136,7 +142,7 @@ if __name__ == "__main__":
     # You can modify this to accept command line arguments
     
     # For testing, create a sample resume file if it doesn't exist
-    sample_resume_path =   "../Rahma Ashraf AlShafi'i.pdf"
+    sample_resume_path =   "backend/Rahma Ashraf AlShafi'i.pdf"
     
     if not os.path.exists(sample_resume_path):
         print(f"Error: Resume file not found at {sample_resume_path}")
@@ -182,4 +188,3 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("AGENT 1 RESUME ANALYZER TEST COMPLETE")
     print("="*60 + "\n")
-    

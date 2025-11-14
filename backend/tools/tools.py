@@ -89,7 +89,7 @@ llm_gemini_flash = get_llm("gemini/gemini-2.5-flash", temperature=0.1)
 # 2. Groq Llama - COMPLETELY FREE (skill extraction)
 llm_groq = get_llm(
     "groq/openai/gpt-oss-120b",
-    temperature=0.2,
+    temperature=0.0,
     api_key=os.environ.get("GROQ_API_KEY") or None
 )
 
@@ -113,22 +113,15 @@ def file_text_extractor(file_path: str) -> str:
             return f"Unsupported file type: {file_extension}. Only PDF files are supported."
         
         # Extract PDF content
-        with open(file_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)  # type: ignore
-            text_content = ""
-            
-            for page_num in range(len(reader.pages)):
-                page_text = reader.pages[page_num].extract_text()
-                if page_text:
-                    text_content += page_text + "\n"
-            
-            if not text_content.strip():
-                return "Could not extract any text from the provided PDF file."
-            
-            return text_content
-            
+        with open(file_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = "".join(page.extract_text() for page in reader.pages)
+            return text if text else "Error: No text could be extracted from the PDF."
+    except FileNotFoundError:
+        return f"Error: The file at {file_path} was not found."
     except Exception as e:
-        return f"Error extracting text from PDF file: {e}"
+        return f"An error occurred while reading the PDF: {e}"
+
 
 
 # SerperDevTool internally expects 'search_query' but agents may pass 'query'
@@ -373,4 +366,3 @@ def question_generator(skill: str, sources_content: str) -> str:
         return str(response) if response else ""
     except Exception as e:
         return f"Error generating questions: {e}"
-
