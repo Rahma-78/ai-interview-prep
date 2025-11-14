@@ -10,14 +10,10 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 import PyPDF2
-from backend.schemas import AllSkillSources, AllInterviewQuestions, Source, InterviewQuestions
+import traceback
+from backend.schemas import AllSkillSources, AllInterviewQuestions, Source, InterviewQuestions, SkillSources
 
 load_dotenv()
-
-# CrewAI requires OPENAI_API_KEY even if we don't use OpenAI
-# This is a known limitation, so we set a placeholder if not configured
-if not os.environ.get("OPENAI_API_KEY"):
-    os.environ["OPENAI_API_KEY"] = "sk-placeholder-crewai-requirement"
 
 # Import LLM locally to avoid circular imports
 def get_llm(model: str, temperature: float = 0.1, api_key: str | None = None):
@@ -59,7 +55,7 @@ class RateLimiter:
             oldest_request = self.request_times[0]
             wait_time = (oldest_request + timedelta(minutes=1) - now).total_seconds()
             if wait_time > 0:
-                print(f"⏳ Rate limit approaching. Waiting {wait_time:.1f}s...")
+                print(f" Rate limit approaching. Waiting {wait_time:.1f}s...")
                 time.sleep(wait_time)
                 self.request_times = []
     
@@ -85,7 +81,9 @@ SEARCH_CACHE: Dict[str, str] = {}
 
 # Initialize LLMs using CrewAI's unified LLM class
 # 1. Gemini Flash - FREE tier (content extraction)
-llm_gemini_flash = get_llm("gemini/gemini-2.5-flash", temperature=0.1)
+llm_gemini_flash = get_llm("gemini/gemini-2.5-flash", 
+                           temperature=0.1,
+                           api_key=os.environ.get("GOOGLE_API_KEY") or None)
 
 # 2. Groq Llama - COMPLETELY FREE (skill extraction)
 llm_groq = get_llm(
@@ -126,7 +124,6 @@ def file_text_extractor(file_path: str) -> str:
         return f"Error: The file at {file_path} was not found."
     except Exception as e:
         print(f"DEBUG: An unexpected error occurred in file_text_extractor: {e}")
-        import traceback
         traceback.print_exc()
         return f"An error occurred while reading the PDF: {e}"
 
@@ -159,7 +156,7 @@ def google_search_tool(search_query: str) -> str:
             # Apply rate limiting before making request
             search_rate_limiter.wait_if_needed()
             
-            print(f"🔍 Searching: '{optimized_query}' (Attempt {attempt + 1}/{max_retries})")
+            print(f" Searching: '{optimized_query}' (Attempt {attempt + 1}/{max_retries})")
             
             # Call the underlying SerperDevTool with the correct parameter name
             result = _serper_tool.run(search_query=optimized_query)  # type: ignore
@@ -178,7 +175,7 @@ def google_search_tool(search_query: str) -> str:
                     if "link" in item and "title" in item:
                         skill_sources.append(Source(uri=item["link"], title=item["title"]).dict())
             
-            formatted_result = AllSkillSources(all_sources=[{"skill": search_query, "sources": skill_sources}]).json()
+            formatted_result = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=skill_sources)]).json()
             
             # Cache successful results
             SEARCH_CACHE[cache_key] = formatted_result
@@ -195,22 +192,22 @@ def google_search_tool(search_query: str) -> str:
                 search_rate_limiter.mark_quota_exhausted(retry_after_seconds=retry_after)
                 
                 if attempt < max_retries - 1:
-                    print(f"⚠️  Rate limit hit. Retrying in {retry_after}s...")
+                    print(f" Rate limit hit. Retrying in {retry_after}s...")
                     time.sleep(retry_after)
                     continue
                 else:
-                    print(f"❌ Quota exhausted after {max_retries} attempts. Using fallback.")
+                    print(f" Quota exhausted after {max_retries} attempts. Using fallback.")
                     return _generate_fallback_results(search_query)
             
             # Handle other errors with regular retry
             elif attempt < max_retries - 1:
-                print(f"⚠️  Error on attempt {attempt + 1}: {e}")
+                print(f" Error on attempt {attempt + 1}: {e}")
                 print(f"   Retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
                 retry_delay *= 2
                 continue
             else:
-                print(f"❌ Failed after {max_retries} attempts: {e}")
+                print(f" Failed after {max_retries} attempts: {e}")
                 return _generate_fallback_results(search_query)
     
     return "No results available"
@@ -243,7 +240,7 @@ def _optimize_search_query(skill: str) -> str:
 
 def _generate_fallback_results(search_query: str) -> str:
     """Generate fallback results when API is exhausted"""
-    print(f"📌 Generating fallback results for '{search_query}'...")
+    print(f" Generating fallback results for '{search_query}'...")
     
     # Fallback should also conform to AllSkillSources schema
     fallback_sources = [
@@ -251,7 +248,7 @@ def _generate_fallback_results(search_query: str) -> str:
         Source(uri=f"https://www.tutorialspoint.com/tutoriallist.htm?keyword={search_query.replace(' ', '_')}", title=f"TutorialsPoint: {search_query}").dict()
     ]
     
-    fallback_data = AllSkillSources(all_sources=[{"skill": search_query, "sources": fallback_sources}]).json()
+    fallback_data = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=fallback_sources)]).json()
     
     return fallback_data
 
@@ -292,7 +289,7 @@ def smart_web_content_extractor(search_query: str, urls: Optional[List[str]] = N
     combined_content = []
     successful_extractions = 0
     
-    print(f"📄 Extracting content from {len(urls_to_extract)} URLs...")
+    print(f" Extracting content from {len(urls_to_extract)} URLs...")
     
     for idx, url in enumerate(urls_to_extract, 1):
         try:
@@ -310,7 +307,7 @@ def smart_web_content_extractor(search_query: str, urls: Optional[List[str]] = N
             text_content = ' '.join(soup.stripped_strings)
 
             if not text_content or len(text_content) < 100:
-                print(f"      ⚠️  Minimal content found")
+                print(f" Minimal content found")
                 continue
 
             # Use LLM to extract relevant info - be concise to save tokens
@@ -327,24 +324,24 @@ def smart_web_content_extractor(search_query: str, urls: Optional[List[str]] = N
             llm_response = llm_gemini_flash.call(messages=[{"role": "user", "content": prompt}])
             
             if llm_response and len(str(llm_response)) > 20:
-                combined_content.append(f"📌 Source: {url}\n{llm_response}\n")
+                combined_content.append(f" Source: {url}\n{llm_response}\n")
                 successful_extractions += 1
                 print(f"      ✓ Content extracted ({len(str(llm_response))} chars)")
             else:
                 print(f"      ✗ No relevant content extracted")
 
         except requests.exceptions.Timeout:
-            print(f"      ✗ Timeout (>15s)")
+            print(f" ✗ Timeout (>15s)")
         except requests.exceptions.RequestException as e:
-            print(f"      ✗ Request error: {str(e)[:50]}")
+            print(f" ✗ Request error: {str(e)[:50]}")
         except Exception as e:
-            print(f"      ✗ Error: {str(e)[:50]}")
+            print(f"✗ Error: {str(e)[:50]}")
     
     if not combined_content:
-        return f"⚠️  Could not extract content from {len(urls_to_extract)} URLs. They may not contain relevant information about '{search_query}'."
+        return f" Could not extract content from {len(urls_to_extract)} URLs. They may not contain relevant information about '{search_query}'."
     
-    result = f"✓ Successfully extracted content from {successful_extractions} sources:\n\n" + "\n".join(combined_content)
-    print(f"\n✓ Extraction complete: {successful_extractions}/{len(urls_to_extract)} sources processed")
+    result = f"Successfully extracted content from {successful_extractions} sources:\n\n" + "\n".join(combined_content)
+    print(f" Extraction complete: {successful_extractions}/{len(urls_to_extract)} sources processed")
     
     return result
 

@@ -1,5 +1,6 @@
 from backend.agents import InterviewPrepAgents
-from backend.tasks import InterviewPrepTasks
+from backend.tasks import InterviewPrepTasks 
+from crewai import Crew, Process
 from backend.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
 import json
 import asyncio
@@ -40,15 +41,17 @@ class InterviewPrepCrew:
             question_task = self.tasks.generate_questions_task(question_generator_agent, "{extract_skills_task}", sources_content="{extract_web_content_task}")
 
             # Create the full crew with all agents
-            from crewai import Crew, Process
+            
             full_crew = Crew(
                 agents=[resume_analyzer, source_discoverer, question_generator_agent],
                 tasks=[skills_task, search_task, extract_task, question_task],
-                process=Process.sequential,
-                verbose=True,
+                # process=Process.sequential, # Process is now set via config or default
+                # verbose=True, # Verbose is now set via config or default
                 # max_rpm=30, # Removed as it might not be supported in this version
                 # Enable async mode for the crew
             )
+            full_crew.process = Process.sequential
+            full_crew.verbose = True
             
             # Run the crew asynchronously
             crew_result = await full_crew.kickoff_async()
@@ -62,7 +65,7 @@ class InterviewPrepCrew:
                 result_data = json.loads(result_str)
                 
                 # Validate against the schema
-                from backend.schemas import AllInterviewQuestions
+              
                 parsed_result = AllInterviewQuestions(**result_data)
                 
                 formatted_results = []
@@ -73,7 +76,7 @@ class InterviewPrepCrew:
                     })
                 
                 total_time = time.time() - start_time
-                print(f"✅ CrewAI processing completed in {total_time:.3f}s")
+                print(f" CrewAI processing completed in {total_time:.3f}s")
                 print(f"   - Total skills with questions: {len(formatted_results)}")
                 
                 return formatted_results

@@ -10,12 +10,9 @@ import asyncio
 import time
 from pathlib import Path
 import ast # Import the ast module
-
+from crewai import Crew, Process
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-# Import CrewAI components
-from crewai import Crew, Process
 from backend.agents import InterviewPrepAgents
 from backend.tasks import InterviewPrepTasks
 from backend.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
@@ -24,25 +21,14 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
     """
     Test Agent 1 functionality (Resume Analyzer) using async CrewAI implementation.
     This mirrors the updated crew approach where Agent 1 uses CrewAI with async execution for resume analysis.
-    
-    Args:
-        resume_file_path: Path to the resume file (PDF, DOCX, or TXT)
-    
-    Returns:
-        dict: Contains extracted skills and performance metrics, matching crew format
+ 
     """
     
     if not os.path.exists(resume_file_path):
         # Error message for missing file, kept as a comment for debugging if needed
-        # print(f"Error: Resume file not found at {resume_file_path}")
+        print(f"Error: Resume file not found at {resume_file_path}")
         return None
-    
-    # Removed verbose print statements for cleaner output
-    # print(f"\n{'='*60}")
-    # print(f"Testing Agent 1: Resume Analyzer (Async CrewAI)")
-    # print(f"Resume file: {resume_file_path}")
-    # print(f"{'='*60}\n")
-    
+
     start_time = time.time()
     
     try:
@@ -64,12 +50,14 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         
         # Create a crew with just Agent 1 (following the same pattern as other agent tests)
         mini_crew = Crew(
-            agents=[agent_1],#
-            tasks=[skills_task],#
-            process=Process.sequential,
-            verbose=True,
+            agents=[agent_1],
+            tasks=[skills_task],
+            # process=Process.sequential, # Process is now set via config or default
+            # verbose=True, # Verbose is now set via config or default
             # max_rpm=30 # Removed for consistency with crew/crew.py
         )
+        mini_crew.process = Process.sequential
+        mini_crew.verbose = True
         
         # Run the crew asynchronously
         # print("[Step 1] Running Async CrewAI for resume analysis...") # Removed print
@@ -122,10 +110,7 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
             }
         
         extraction_time = time.time() - start_time
-        
-        # print(f"SUCCESS: Extracted {len(skills_list)} skills using CrewAI") # Removed print
-        # for idx, skill in enumerate(skills_list, 1): # Removed print
-        #     print(f"   {idx}. {skill}") # Removed print
+       
         
         # Save skills to JSON file
         output_path = "backend/tests/extracted_skills.json" # Updated path
@@ -164,12 +149,11 @@ if __name__ == "__main__":
     # You can modify this to accept command line arguments
     
     # For testing, create a sample resume file if it doesn't exist
-    sample_resume_path =   str(Path(__file__).parent.parent / "Rahma Ashraf AlShafi'i.pdf")
-    # print(f"DEBUG: Resolved resume path: {sample_resume_path}") # Removed print
+    sample_resume_path = str(Path(__file__).parent.parent / "Rahma Ashraf AlShafi'i.pdf")
     
     if not os.path.exists(sample_resume_path):
-        # print(f"Error: Resume file not found at {sample_resume_path}") # Removed print
-        # print("Please ensure the resume file exists before running the test.") # Removed print
+        print(f"Error: Resume file not found at {sample_resume_path}")
+        print("Please ensure the resume file exists before running the test.")
         exit(1)
     
     # Run Agent 1 test
