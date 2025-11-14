@@ -1,52 +1,31 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from typing import List, Dict, Any
 import os
-from dotenv import load_dotenv
 import shutil
 import json
-import subprocess
-import asyncio
-from fastapi.responses import FileResponse
+from app.services.crew.crew import InterviewPrepCrew
+from app.schemas.interview import InterviewQuestion
+from app.api.deps import get_crew_instance # Import the dependency
 
-from backend.crew import InterviewPrepCrew
+interview_router = APIRouter()
 
-# Load environment variables
-load_dotenv()
-
-app = FastAPI()
-
-class InterviewQuestion(BaseModel):
-    skill: str
-    query: str | None = None
-    sources: List[Dict] | None = None
-    questions: List[str] | None = None
-    isLoading: bool = False # Changed to False as processing will be done by backend
-    error: str | None = None
-
-@app.get("/")
-async def read_root():
-    return FileResponse('backend/templates/index.html')
-
-@app.get("/run-tests/")
-async def run_tests():
-    result = subprocess.run(['python', '-m', 'unittest', 'backend/tests/'], capture_output=True, text=True)
-    return {"output": result.stdout + result.stderr}
-
-@app.post("/generate-questions/", response_model=List[InterviewQuestion])
-async def generate_interview_questions(resume_file: UploadFile = File(...)):
+@interview_router.post("/generate-questions/", response_model=List[InterviewQuestion])
+async def generate_interview_questions(
+    resume_file: UploadFile = File(...),
+    crew: InterviewPrepCrew = Depends(get_crew_instance)
+):
     if not resume_file.filename:
         raise HTTPException(status_code=400, detail="No resume file provided.")
 
     # Save the uploaded file temporarily
     file_location = f"temp_{resume_file.filename}"
-    crew = None  # Initialize crew to None
+    # The crew instance is now provided by dependency injection
     try:
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(resume_file.file, buffer)
         
-        # Create the crew with full CrewAI approach (all agents use CrewAI with async execution)
-        crew = InterviewPrepCrew(file_path=file_location)
+        # Set the file_path on the injected crew instance
+        crew.file_path = file_location
         
         # Run the crew with CrewAI async processing (async execution enabled at agent and crew level)
         result = await crew.run_async()
@@ -68,7 +47,7 @@ async def generate_interview_questions(resume_file: UploadFile = File(...)):
                 # Handle cases where the crew output might not be as expected
                 print(f"Unexpected item in crew result: {item}")
                 formatted_results.append(
-                    InterviewQuestion(#
+                    InterviewQuestion(
                         skill="Unknown",
                         error="Failed to parse questions from AI crew.",
                         isLoading=False
@@ -80,11 +59,7 @@ async def generate_interview_questions(resume_file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing resume: {e}")
     finally:
-        # Clean up the temporary file and crew resources
+        # Clean up the temporary file
         if os.path.exists(file_location):
             os.remove(file_location)
-        try:
-            if crew is not None:
-                crew.cleanup()
-        except Exception as e:
-            print(f"Error during cleanup: {e}")
+        # The cleanup for the crew instance is handled by the dependency `get_crew_instance`

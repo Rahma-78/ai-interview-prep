@@ -1,11 +1,11 @@
-from backend.agents import InterviewPrepAgents
-from backend.tasks import InterviewPrepTasks 
+from app.services.agents.agents import InterviewPrepAgents
+from app.services.tasks.tasks import InterviewPrepTasks 
 from crewai import Crew, Process
-from backend.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
+from app.services.tools.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
 import json
 import asyncio
 import time
-from backend.schemas import AllInterviewQuestions
+from app.schemas.interview import AllInterviewQuestions
 
 class InterviewPrepCrew:
     def __init__(self, file_path: str):

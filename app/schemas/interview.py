@@ -1,5 +1,14 @@
 from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any
+
+class InterviewQuestion(BaseModel):
+    skill: str
+    query: str | None = None
+    sources: List[Dict] | None = None
+    questions: List[str] | None = None
+    isLoading: bool = False # Changed to False as processing will be done by backend
+    error: str | None = None
 
 class ExtractedSkills(BaseModel):
     skills: List[str] = Field(description="A list of technical skills found in the resume.")

@@ -1,7 +1,7 @@
 from crewai import Agent
 from dotenv import load_dotenv
-from backend.tools import llm_groq, llm_openrouter, llm_gemini_flash
-from backend.schemas import ExtractedSkills, AllSkillSources, AllInterviewQuestions
+from app.services.tools.tools import llm_groq, llm_openrouter, llm_gemini_flash
+from app.schemas.interview import ExtractedSkills, AllSkillSources, AllInterviewQuestions
 from typing import Generator, List, Dict, Any, Optional
 import asyncio
 import threading

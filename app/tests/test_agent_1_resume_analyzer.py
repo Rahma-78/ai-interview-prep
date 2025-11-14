@@ -13,10 +13,10 @@ import ast # Import the ast module
 from crewai import Crew, Process
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from backend.agents import InterviewPrepAgents
-from backend.tasks import InterviewPrepTasks
-from backend.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
-from backend.schemas import ExtractedSkills
+from app.services.agents.agents import InterviewPrepAgents
+from app.services.tasks.tasks import InterviewPrepTasks
+from app.services.tools.tools import file_text_extractor, google_search_tool, smart_web_content_extractor, question_generator
+from app.schemas.interview import ExtractedSkills
 async def test_agent_1_resume_analyzer(resume_file_path: str):
     """
     Test Agent 1 functionality (Resume Analyzer) using async CrewAI implementation.
@@ -113,7 +113,7 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
        
         
         # Save skills to JSON file
-        output_path = "backend/tests/extracted_skills.json" # Updated path
+        output_path = "tests/extracted_skills.json" # Updated path
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump({"skills": skills_list}, f, indent=2, ensure_ascii=False)
         # print(f"\nSkills saved to: {output_path}") # Removed print

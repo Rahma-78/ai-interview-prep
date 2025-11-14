@@ -1,11 +1,11 @@
 from crewai import Task
 import json
-from backend.schemas import ExtractedSkills, AllSkillSources, AllInterviewQuestions
+from app.schemas.interview import ExtractedSkills, AllSkillSources, AllInterviewQuestions
 from typing import List, Dict, Any
 
 # Import tools directly from the backend module
 try:
-    from backend.tools import (
+    from app.services.tools.tools import (
         file_text_extractor,
         google_search_tool,
         smart_web_content_extractor,
@@ -56,7 +56,7 @@ class InterviewPrepTasks:
             tools=[file_text_extractor],  # type: ignore
             expected_output="JSON object with 'skills' key containing 10 specific, technical skill strings relevant to the candidate's background.",
             output_json=ExtractedSkills, # Enforce output format
-            output_file="backend/tests/extracted_skills.json" # Save output to file in the tests directory
+            output_file="app/tests/extracted_skills.json" # Save output to file in the tests directory
         )
 
     def search_sources_task(self, agent, skill: str):

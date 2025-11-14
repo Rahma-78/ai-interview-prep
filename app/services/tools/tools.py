@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 import PyPDF2
 import traceback
-from backend.schemas import AllSkillSources, AllInterviewQuestions, Source, InterviewQuestions, SkillSources
+from app.schemas.interview import AllSkillSources, AllInterviewQuestions, Source, InterviewQuestions, SkillSources
 
 load_dotenv()
 
@@ -173,7 +173,7 @@ def google_search_tool(search_query: str) -> str:
             if "organic" in parsed_serper_result:
                 for item in parsed_serper_result["organic"]:
                     if "link" in item and "title" in item:
-                        skill_sources.append(Source(uri=item["link"], title=item["title"]).dict())
+                        skill_sources.append(Source(uri=item["link"], title=item["title"]))
             
             formatted_result = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=skill_sources)]).json()
             
