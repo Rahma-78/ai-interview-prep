@@ -1,14 +1,14 @@
 {
   "skills": [
     "Python",
+    "Machine Learning",
+    "Deep Learning",
+    "Natural Language Processing (NLP)",
+    "Computer Vision",
     "TensorFlow",
     "PyTorch",
-    "Scikit-learn",
     "FastAPI",
     "Docker",
-    "SQL",
-    "OpenCV",
-    "LangChain",
-    "Large Language Models (LLMs)"
+    "SQL"
   ]
 }

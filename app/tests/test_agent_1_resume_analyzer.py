@@ -13,7 +13,7 @@ import time
 import traceback
 from pathlib import Path
 
-from crewai import Crew, Process
+from crewai import Crew as CrewAI, Process
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -57,7 +57,7 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         tasks = InterviewPrepTasks()
         skills_task = tasks.extract_skills_task(agent_1, resume_file_path)
         
-        mini_crew = Crew(
+        mini_crew = CrewAI (  
             agents=[agent_1],
             tasks=[skills_task],
             process=Process.sequential,

@@ -4,7 +4,7 @@ import json
 import logging
 import time
 
-from crewai import Crew, Process # Moved import to top
+from crewai import Crew as CrewAI, Process
 
 from app.schemas.interview import AllInterviewQuestions
 from app.services.agents.agents import InterviewPrepAgents
@@ -49,7 +49,7 @@ class InterviewPrepCrew:
             extract_task = self.tasks.extract_web_content_task(source_discoverer, urls_reference="{search_sources_task}", skill="{extract_skills_task}")
             question_task = self.tasks.generate_questions_task(question_generator_agent, "{extract_skills_task}", sources_content="{extract_web_content_task}")
 
-            full_crew = Crew(
+            full_crew = CrewAI(
                 agents=[resume_analyzer, source_discoverer, question_generator_agent],
                 tasks=[skills_task, search_task, extract_task, question_task],
                 process=Process.sequential,

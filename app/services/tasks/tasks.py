@@ -28,10 +28,12 @@ class InterviewPrepTasks:
         Defines the task for extracting technical skills from a resume.
         """
         return Task(  # type: ignore
-            description=(f"Extract 10 key technical skills from {file_path} using 'File Text Extractor'. "
-                       "Focus on technical sections, ignoring fluff. "
-                       "Output MUST be JSON: {{'skills': [list of 10 skill strings]}}."
-                       ),
+            description=(
+        f"Use the file text extractor tool to read the resume at '{file_path}'. "
+        f"From the content, extract the 10 most significant technical skills. "
+        f"ignoring fluff and focusing on what matters for a technical role."
+        f"Focus strictly on foundational concepts, and identify only core competencies."
+    ),
             agent=agent,
             tools=[file_text_extractor],  # type: ignore
             expected_output="JSON object with 'skills' key containing 10 specific, technical skill strings relevant to the candidate's background.",

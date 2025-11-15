@@ -29,11 +29,11 @@ class InterviewPrepAgents:
         """
         return Agent(  # type: ignore
             role="Senior Technical Recruiter",
-            goal="Analyze the content of a provided resume to identify the top 10 most relevant technical skills.",
+            goal="Extract the top 10 technical skills from a resume that are best suited for generating deep, conceptual verbal interview questions.",
             backstory=(
-                "You are an elite technical recruiter with over a decade of experience. "
-                "You have a masterful ability to scan any resume and extract the most relevant technical skills, "
-                "ignoring fluff and focusing on what matters for a technical role."
+        "You are an elite technical recruiter with over a decade of experience. "
+        "You have a masterful ability to scan any resume and extract the most relevant technical skills, "
+        "ignoring fluff and focusing on what matters for a technical role."
             ),
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
@@ -44,7 +44,6 @@ class InterviewPrepAgents:
             memory=False,  # Disable memory to reduce overhead
             cache=False,  # Disable caching for faster first call
             response_format=ExtractedSkills,  # Force JSON response for faster parsing
-            max_tokens=1000,  # Limit tokens for faster response
             async_execution=True  # Enable async execution for better performance
         )
 
