@@ -13,7 +13,7 @@ from crewai import Crew, Process
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from app.schemas.interview import AllSkillSources, Source
+from app.schemas.interview import AllSkillSources, SkillSources
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import google_search_tool, smart_web_content_extractor
@@ -95,29 +95,21 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
             search_crew = Crew(
                 agents=[source_discoverer],
                 tasks=[search_task],
-                process=Process.sequential,
-                verbose=False,
+                process=Process.sequential
             )
             
             search_result = await search_crew.kickoff_async()
             
             urls = []
-            try:
-                parsed_result = AllSkillSources(**json.loads(str(search_result)))
-                for skill_source_item in parsed_result.all_sources:
-                    if skill_source_item.skill.lower() == skill.lower():
-                        urls = [source.uri for source in skill_source_item.sources]
-                        break
-                
-                logging.debug(f"Extracted {len(urls)} URLs from search result for skill '{skill}'")
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logging.debug(f"Error parsing search result as AllSkillSources: {e}")
-                logging.debug(f"Raw search result string: {str(search_result)[:500]}...")
-                import re
-                url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+'
-                urls = re.findall(url_pattern, str(search_result))
-                logging.debug(f"Found {len(urls)} URLs via regex fallback")
+            # The search_result is a CrewOutput object; its .raw attribute contains the raw JSON string.
+            # We parse this raw string and the pydantic model handles validation.
+            parsed_result = AllSkillSources(**json.loads(search_result.raw))
+            for skill_source_item in parsed_result.all_sources:
+                if skill_source_item.skill.lower() == skill.lower():
+                    urls = [uri for uri in skill_source_item.sources]
+                    break
+            
+            logging.debug(f"Successfully parsed and extracted {len(urls)} URLs for skill '{skill}'")
             
             return skill, {
                 "urls": urls[:MAX_URLS_PER_SKILL],

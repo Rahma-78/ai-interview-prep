@@ -22,7 +22,6 @@ from app.schemas.interview import (
     AllSkillSources,
     InterviewQuestions,
     SkillSources,
-    Source,
 )
 from app.core.config import settings
 
@@ -42,7 +41,7 @@ def get_llm(model: str, temperature: float = 0.1, api_key: str | None = None):
     Returns:
         LLM: An instance of the CrewAI LLM.
     """
-    from crewai import LLM
+    from crewai.llm import LLM
     return LLM(model=model, temperature=temperature, api_key=api_key)
 
 
@@ -203,22 +202,39 @@ def google_search_tool(search_query: str) -> str:
             logging.info(f" Searching: '{optimized_query}' (Attempt {attempt + 1}/{max_retries})")
             
             # Call the underlying SerperDevTool with the correct parameter name
-            result = _serper_tool.run(search_query=optimized_query)  # type: ignore
-            result_str = str(result) if result else "No results found"
+            raw_serper_result = _serper_tool.run(search_query=optimized_query)  # type: ignore
             
-            logging.debug(f"Search result type: {type(result)}")
-            logging.debug(f"Search result (first 500 chars): {str(result)[:500] if result else 'None'}")
+            logging.debug(f"Raw SerperDevTool result type: {type(raw_serper_result)}")
+            logging.debug(f"Raw SerperDevTool result (full): {raw_serper_result}") # Log full raw result for inspection
             
-            # Parse and reformat the result to match AllSkillSources schema
-            parsed_serper_result = json.loads(result_str)
+            # Ensure the result is a proper JSON string before parsing
+            if isinstance(raw_serper_result, dict):
+                result_json_str = json.dumps(raw_serper_result)
+            elif isinstance(raw_serper_result, str):
+                result_json_str = raw_serper_result
+            else:
+                logging.error(f"Unexpected type for SerperDevTool result: {type(raw_serper_result)}")
+                raise TypeError("SerperDevTool did not return a dictionary or a JSON string.")
             
-            skill_sources = []
+            parsed_serper_result = json.loads(result_json_str)
+            
+            # Construct the result to match the updated AllSkillSources schema
+            result_uris = []
             if "organic" in parsed_serper_result:
                 for item in parsed_serper_result["organic"]:
-                    if "link" in item and "title" in item:
-                        skill_sources.append(Source(uri=item["link"], title=item["title"]))
+                    if "link" in item:
+                        # Ensure URIs are clean by stripping any problematic trailing characters
+                        clean_uri = item["link"].strip()
+                        if clean_uri.endswith("',"): # Specific check for the reported malformation
+                            clean_uri = clean_uri[:-2]
+                        elif clean_uri.endswith(","):
+                            clean_uri = clean_uri[:-1]
+                        
+                        logging.debug(f"Original link: '{item['link']}'")
+                        logging.debug(f"Cleaned URI: '{clean_uri}'")
+                        result_uris.append(clean_uri)
             
-            formatted_result = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=skill_sources)]).json()
+            formatted_result = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=result_uris)]).json()
             
             # Cache successful results
             SEARCH_CACHE[cache_key] = formatted_result
@@ -291,12 +307,12 @@ def _generate_fallback_results(search_query: str) -> str:
     """
     logging.info(f" Generating fallback results for '{search_query}'...")
     
-    fallback_sources = [
-        Source(uri=f"https://en.wikipedia.org/wiki/{search_query.replace(' ', '_')}", title=f"Wikipedia: {search_query}"),
-        Source(uri=f"https://www.tutorialspoint.com/tutoriallist.htm?keyword={search_query.replace(' ', '_')}", title=f"TutorialsPoint: {search_query}")
+    fallback_uris = [
+        f"https://en.wikipedia.org/wiki/{search_query.replace(' ', '_')}",
+        f"https://www.tutorialspoint.com/tutoriallist.htm?keyword={search_query.replace(' ', '_')}"
     ]
     
-    fallback_data = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=fallback_sources)]).json()
+    fallback_data = AllSkillSources(all_sources=[SkillSources(skill=search_query, sources=fallback_uris)]).json()
     
     return fallback_data
 
@@ -328,8 +344,8 @@ async def smart_web_content_extractor(search_query: str, urls: Optional[List[str
 
     urls_to_extract: List[str] = []
     for skill_source_item in all_skill_sources.all_sources:
-        for source in skill_source_item.sources:
-            urls_to_extract.append(source.uri)
+        for uri in skill_source_item.sources: # 'source' is now 'uri' (string)
+            urls_to_extract.append(uri)
             
     urls_to_extract = urls_to_extract[:8] # Limit to 8 URLs max
     

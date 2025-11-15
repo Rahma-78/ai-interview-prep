@@ -58,10 +58,9 @@ class InterviewPrepCrew:
             
             crew_result = await full_crew.kickoff_async()
             
-            result_str = str(crew_result)
-            
             try:
-                result_data = json.loads(result_str)
+                # The crew_result object's .raw attribute contains the raw JSON string output
+                result_data = json.loads(crew_result.raw)
                 parsed_result = AllInterviewQuestions(**result_data)
                 
                 formatted_results = []

@@ -50,12 +50,12 @@ class InterviewPrepTasks:
                        f"Use the 'Google Search Tool' with this optimized query: '{optimized_query}'. "
                        "Search for authoritative sources like tutorials, educational websites, documentation, and interview question websites. "
                        "Focus on text-based content (articles, documentation, Q&A sites, blogs, guides). "
-                       "The output should be a JSON string containing a list of dictionaries, where each dictionary has a 'uri' key with the URL and a 'title' key with the page title. "
+                       "The output should be a JSON string containing a list of URLs (strings). "
                        "Return ALL found URLs (up to 5-10 results for better coverage). "
                        "CRITICAL: Make only ONE search attempt. If the search returns no results, return an empty list. Do NOT try multiple search queries or variations.",
             agent=agent,
             tools=[google_search_tool],  # type: ignore
-            expected_output="A JSON string containing a list of dictionaries with 'uri' and 'title' keys, prioritizing high-quality, text-based, authoritative sources. If no results are found, return an empty list.",
+            expected_output="A JSON string containing a list of high-quality, text-based, authoritative URLs. If no results are found, return an empty list.",
             output_json=AllSkillSources # Enforce output format
         )
 

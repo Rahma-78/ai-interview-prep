@@ -12,13 +12,9 @@ class InterviewQuestion(BaseModel):
 class ExtractedSkills(BaseModel):
     skills: List[str] = Field(description="A list of technical skills found in the resume.")
 
-class Source(BaseModel):
-    uri: str = Field(description="The URI of the discovered web page.")
-    title: str = Field(description="The title of the discovered web page.")
-
 class SkillSources(BaseModel):
     skill: str = Field(description="The technical skill.")
-    sources: List[Source] = Field(description="A list of authoritative web sources for this skill.")
+    sources: List[str] = Field(description="A list of authoritative web sources (URIs) for this skill.")
 
 class AllSkillSources(BaseModel):
     all_sources: List[SkillSources] = Field(description="A list of all skills with their sources.")
