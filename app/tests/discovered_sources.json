@@ -1,12 +1,102 @@
 {
+  "Machine Learning": [
+    "https://www.geeksforgeeks.org/machine-learning/machine-learning-interview-questions/",
+    "https://www.linkedin.com/posts/vinija_ml-interview-guide-ive-been-compiling-activity-7200691704172060674-DHQO",
+    "https://www.reddit.com/r/learnmachinelearning/comments/1dvru3y/how_to_ace_machine_learning_interviews_my/",
+    "https://skphd.medium.com/ml-pipeline-best-practices-interview-questions-and-answers-b1edc6c81053",
+    "https://www.hipeople.io/interview-questions/machine-learning-interview-questions",
+    "https://github.com/andrewekhalel/MLQuestions",
+    "https://365datascience.com/career-advice/job-interview-tips/machine-learning-interview-questions-and-answers/",
+    "https://www.vervecopilot.com/interview-questions/top-30-most-common-machine-learning-interview-questions-you-should-prepare-for"
+  ],
+  "Computer Vision": [
+    "https://www.geeksforgeeks.org/computer-vision/computer-vision-interview-questions/",
+    "https://opencv.org/blog/computer-vision-engineer-interview-questions/",
+    "https://github.com/Devinterview-io/computer-vision-interview-questions",
+    "https://www.indeed.com/career-advice/interviewing/computer-vision-interview-questions",
+    "https://www.reddit.com/r/computervision/comments/10ybf5z/how_can_i_prepare_best_for_my_interview/",
+    "https://365datascience.com/career-advice/job-interview-tips/computer-vision-interview-questions/",
+    "https://www.mlstack.cafe/blog/computer-vision-interview-questions",
+    "https://www.facebook.com/groups/mlban/posts/2246033735902727/"
+  ],
   "Python": [
     "https://www.geeksforgeeks.org/python/python-interview-questions/",
     "https://www.w3schools.com/python/python_interview_questions.asp",
-    "https://www.reddit.com/r/learnpython/comments/1cnh2u7/where_to_practice_for_python_interview/",
     "https://realpython.com/courses/python-coding-interviews-tips-best-practices/",
+    "https://www.reddit.com/r/learnpython/comments/1cnh2u7/where_to_practice_for_python_interview/",
     "https://www.udacity.com/blog/2024/12/top-python-interview-questions-for-your-next-job-opportunity.html",
     "https://pynative.com/python/interview-questions/",
-    "https://medium.com/@AlexanderObregon/common-python-interview-questions-and-answers-a7cba977d56e",
-    "https://github.com/Tanu-N-Prabhu/Python/blob/master/Python%20Coding%20Interview%20Prep/Python%20Coding%20Interview%20Questions%20(Beginner%20to%20Advanced).md"
+    "https://dev.to/vjnvisakh/unveiling-the-top-50-python-interview-questions-a-deep-dive-into-python-proficiency-27nd",
+    "https://www.codecademy.com/learn/technical-interview-practice-python"
+  ],
+  "Natural Language Processing (NLP)": [
+    "https://365datascience.com/career-advice/job-interview-tips/nlp-interview-questions/",
+    "https://www.interviewbit.com/nlp-interview-questions/",
+    "https://www.vervecopilot.com/blog/30-most-common-nlp-interview-questions-you-should-prepare-for",
+    "https://github.com/Devinterview-io/nlp-interview-questions",
+    "https://www.wecreateproblems.com/interview-questions/natural-language-processing-interview-questions",
+    "https://www.interviewnode.com/post/nlp-interview-prep-key-concepts-and-questions",
+    "https://www.geeksforgeeks.org/nlp/natural-language-processing-nlp-tutorial/",
+    "https://www.sprintzeal.com/blog/nlp-interview-questions"
+  ],
+  "Deep Learning": [
+    "https://www.tryexponent.com/blog/top-deep-learning-interview-questions",
+    "https://www.geeksforgeeks.org/deep-learning/deep-learning-interview-questions/",
+    "https://fonzi.ai/blog/deep-learning-interview-questions",
+    "https://www.reddit.com/r/MachineLearning/comments/1kogoxy/d_coding_ml_questions_for_interview_preparation/",
+    "https://arxiv.org/pdf/2201.00650",
+    "https://www.stratascratch.com/blog/a-guide-to-tackling-challenging-deep-learning-interview-questions/",
+    "https://github.com/youssefHosni/Data-Science-Interview-Questions-Answers/blob/main/Deep%20Learning%20Questions%20&%20Answers%20for%20Data%20Scientists.md",
+    "https://www.interviewbit.com/deep-learning-interview-questions/"
+  ],
+  "PyTorch": [
+    "https://github.com/Devinterview-io/pytorch-interview-questions",
+    "https://www.reddit.com/r/learnmachinelearning/comments/1i16h0q/leetcode_style_pytorch_practice_problems/",
+    "https://medium.com/@anqi.silvia/i-summarized-the-top-pytorch-interview-questions-and-their-answers-2f9a3ec7638c",
+    "https://www.mlstack.cafe/blog/pytorch-interview-questions",
+    "https://hackmd.io/@husseinsheikho/pytorch-interview",
+    "https://www.vervecopilot.com/interview-questions/top-30-most-common-pytorch-interview-questions-you-should-prepare-for",
+    "https://www.adaface.com/blog/pytorch-interview-questions/",
+    "https://www.index.dev/interview-questions/pytorch"
+  ],
+  "SQL": [
+    "https://www.interviewbit.com/sql-interview-questions/",
+    "https://www.reddit.com/r/SQL/comments/nww7g0/best_way_to_cram_for_sql_interview_test/",
+    "https://www.geeksforgeeks.org/sql/sql-interview-questions/",
+    "https://data-storyteller.medium.com/how-to-approach-sql-problems-during-a-technical-interview-for-a-data-analytics-role-697efdc79572",
+    "https://datalemur.com/sql-interview-questions",
+    "https://gist.github.com/monbang/76151aa5f36d5c058f95ce396d992bdb",
+    "https://www.interviewquery.com/p/sql-scenario-based-interview-questions",
+    "https://www.udacity.com/blog/2025/04/top-sql-interview-questions-and-how-to-answer-them-like-a-pro.html"
+  ],
+  "TensorFlow": [
+    "https://www.turing.com/interview-questions/tensorflow",
+    "https://www.igmguru.com/blog/tensorflow-interview-questions",
+    "https://github.com/Devinterview-io/tensorflow-interview-questions",
+    "https://www.synergisticit.com/tensorflow-interview-questions-and-answers-part-2/",
+    "https://www.analyticsvidhya.com/blog/2022/11/top-8-interview-questions-on-tensorflow/",
+    "https://www.multisoftsystems.com/interview-questions/tensorflow-interview-questions-answers",
+    "https://www.adaface.com/blog/tensorflow-interview-questions/",
+    "https://interviewbite.in/tutorial-tensorflow-tensorflow-variables/"
+  ],
+  "Docker": [
+    "https://www.interviewbit.com/docker-interview-questions/",
+    "https://www.simplilearn.com/tutorials/docker-tutorial/docker-interview-questions",
+    "https://medium.com/@devopsdiariesinfo/50-questions-every-engineer-must-know-docker-cd49d0d268dc",
+    "https://www.turing.com/interview-questions/docker",
+    "https://www.reddit.com/r/docker/comments/ptu51f/a_collection_of_mustprepare_docker_interview_qnas/",
+    "https://interview.in28minutes.com/docker/",
+    "https://www.udemy.com/course/docker-interview-questions/?srsltid=AfmBOoooEeb8FALEjlru6HK-qLK7Tz-GjeHmB3rfCxd6XJonuF8GQKgs",
+    "https://www.vervecopilot.com/blog/docker-interview-questions"
+  ],
+  "FastAPI": [
+    "https://medium.com/@theamanshakya/fastapi-interview-preparation-guide-2025-bdf2b468c753",
+    "https://www.index.dev/interview-questions/fastapi-developer",
+    "https://www.vskills.in/certification/tutorial/top-50-fastapi-job-interview-questions-and-answer/",
+    "https://www.linkedin.com/pulse/top-fastapi-interview-questions-gajanan-patil-rbqof",
+    "https://www.scribd.com/document/866448430/Top-50-FastAPI-Job-Interview-Questions-and-Answer",
+    "https://slashdev.io/-fastapi-developer-interview-questions-what-to-expect-in-2025",
+    "https://www.javainuse.com/interview/fastapi",
+    "https://www.supecoder.dev/interview-kit/fastapi-interview/advanced-questions"
   ]
 }

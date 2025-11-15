@@ -45,11 +45,9 @@ class InterviewPrepTasks:
         """
         Defines the task for searching high-quality web sources for a given skill.
         """
-        optimized_query = f"{skill} interview questions tutorial best practices -youtube -vimeo"
-        
         return Task(  # type: ignore
             description=f"Find high-quality technical interview questions and learning resources for '{skill}'. "
-                       f"Use the 'Google Search Tool' with this optimized query: '{optimized_query}'. "
+                       f"Use the 'Google Search Tool' to automatically optimize the search query. "
                        "Search for authoritative sources like tutorials, educational websites, documentation, and interview question websites. "
                        "Focus on text-based content (articles, documentation, Q&A sites, blogs, guides). "
                        "The output should be a JSON string containing a list of URLs (strings). "
