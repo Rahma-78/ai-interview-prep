@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
 import os
-import time
 from typing import List, Optional
-
+from requests.exceptions import RequestException
 import httpx
 import PyPDF2
 from bs4 import BeautifulSoup
@@ -14,41 +11,31 @@ from crewai.tools import tool
 from dotenv import load_dotenv
 
 from app.schemas.interview import (
-    AllInterviewQuestions,
     AllSkillSources,
     InterviewQuestions,
+    AllInterviewQuestions,
     SkillSources,
 )
 from app.services.tools.helpers import (
-    _generate_fallback_results,
-    _optimize_search_query,
+    generate_fallback_results,
+    optimize_search_query,
 )
 from app.services.tools.llm import llm_gemini_flash, llm_openrouter
 from app.services.tools.search_tool import get_serper_tool
-from app.services.tools.utils import SEARCH_CACHE, search_rate_limiter
+from app.services.tools.utils import  async_rate_limiter
 
-# Initialize SerperDevTool
-_serper_tool = get_serper_tool()
-
-# Configure logging
-load_dotenv()
+# Configure logging and load environment variables first
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent.parent / 'core' / '.env')
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-"""
-Collection of tools for the interview preparation system.
-
-This module provides various tools for:
-- PDF text extraction
-- Google search with caching
-- Web content extraction
-- Interview question generation
-
-All tools are decorated with the @tool decorator for CrewAI compatibility.
-"""
 
 logger = logging.getLogger(__name__)
+
+# Initialize SerperDevTool after environment variables are loaded
+_serper_tool = get_serper_tool()
 
 @tool
 def file_text_extractor(file_path: str) -> str:
@@ -87,63 +74,81 @@ def file_text_extractor(file_path: str) -> str:
     except Exception as e:
         logger.error(f"Unexpected error in file_text_extractor for {file_path}: {e}", exc_info=True)
         return f"An error occurred while reading the PDF: {str(e)}"
+    
 @tool
-def google_search_tool(search_query: str) -> str:
+async def google_search_tool(
+    search_query: str,
+    max_retries: int = 3,
+    initial_delay: float = 2.0
+) -> str:
     """
-    Performs a Google search and returns relevant snippets and URLs.
+    Performs an ASYNCHRONOUS Google search with optimized caching, retries,
+    and error handling.
     """
-    max_retries = 3
-    retry_delay = 2
+    try:
+        optimized_query = optimize_search_query(search_query)
+    except Exception as e:
+        logger.error(f"Query optimization failed for '{search_query}': {e}. Using original.")
+        optimized_query = search_query
 
-    optimized_query = _optimize_search_query(search_query)
-    cache_key = f"search:{optimized_query.lower()}"
-    if cache_key in SEARCH_CACHE:
-        logger.info(f"✓ Cache hit for '{search_query}'")
-        return SEARCH_CACHE[cache_key]
-
+    retry_delay = initial_delay
+    
     for attempt in range(max_retries):
         try:
-            search_rate_limiter.wait_if_needed()
+            # 4. Await the rate limiter
+            await async_rate_limiter.wait_if_needed() 
             logger.info(
                 f" Searching: '{optimized_query}' (Attempt {attempt + 1}/{max_retries})"
             )
 
-            raw_result = _serper_tool.run(search_query=optimized_query)
+            # 5. Await the async tool method
+            # CORRECT: Awaiting the asynchronous function
+            # This runs the blocking .run() function in a separate thread,
+# awaits the thread's completion, and returns the result—all
+# without blocking the main asyncio loop.
+            raw_result = await asyncio.to_thread(
+                _serper_tool.run, 
+                search_query=optimized_query
+            )
+                                    
+            # 6. FIXED: Await the async record_request method
+            await async_rate_limiter.record_request()
+
             parsed_result = (
                 json.loads(raw_result)
                 if isinstance(raw_result, str)
                 else raw_result
             )
 
-            result_uris = [
-                item["link"].strip()
-                for item in parsed_result.get("organic", [])
-                if "link" in item
-            ]
+            result_uris = []
+            for item in parsed_result.get("organic", []):
+                link = item.get("link")
+                if link and link.strip():
+                    result_uris.append(link.strip())
+
             formatted_result = AllSkillSources(
                 all_sources=[
-                    SkillSources(skill=optimized_query, sources=result_uris)
+                SkillSources(skill=optimized_query, sources=result_uris)
                 ]
             ).json()
 
-            SEARCH_CACHE[cache_key] = formatted_result
-            search_rate_limiter.record_request()
+        
             return formatted_result
 
-        except Exception as e:
-            logger.error(f"Search attempt {attempt + 1} failed for query '{optimized_query}': {e}", exc_info=True)
+        except (RequestException, json.JSONDecodeError, KeyError, TypeError) as e:
+            logger.error(f"Search attempt {attempt + 1} failed for '{optimized_query}': {type(e).__name__}: {e}")
             if attempt < max_retries - 1:
                 logger.info(f"Retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
+                await asyncio.sleep(retry_delay) 
                 retry_delay *= 2
-            else:
-                logger.warning(f"All search retries failed for '{optimized_query}'. Using fallback results.")
-                return _generate_fallback_results(optimized_query)
-
-    # This line should never be reached due to the return in the else block above
-    return _generate_fallback_results(optimized_query)
-
-
+            
+    else:
+        logger.warning(f"All search retries failed for '{optimized_query}'. Using fallback.")
+        
+        # 7. Check if your fallback is also async
+        # If _generate_fallback_results is async, it needs 'await'
+        # If it's a normal sync function, this is fine.
+        return generate_fallback_results(optimized_query)
 @tool
 def smart_web_content_extractor(
     search_query: str, urls: Optional[List[str]] = None
@@ -157,7 +162,7 @@ def smart_web_content_extractor(
     try:
         # Create a dummy SkillSources object to conform to AllSkillSources schema
         skill_sources_obj = SkillSources(skill=search_query, sources=urls)
-        all_skill_sources = AllSkillSources(all_sources=[skill_sources_obj])
+        all_skill_sources = AllSkillSources(all_sources=[skill_sources_obj])#
     except Exception as e:
         logger.error(f"Error processing URLs for '{search_query}': {e}", exc_info=True)
         return f"Error: Could not process URLs for '{search_query}': {str(e)}"
@@ -252,4 +257,3 @@ def question_generator(skill: str, sources_content: str) -> str:
             "questions": [],
             "error": f"Question generation failed: {str(e)}"
         })
-

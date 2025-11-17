@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from crewai import Crew, Process
+from crewai import Crew as CrewAI, Process
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -92,7 +92,7 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
         
         try:
             search_task = tasks.search_sources_task(source_discoverer, skill)
-            search_crew = Crew(
+            search_crew = CrewAI(
                 agents=[source_discoverer],
                 tasks=[search_task],
                 process=Process.sequential
@@ -119,7 +119,7 @@ async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, de
             }
         
         except Exception as e:
-            logging.error(f"   ⚠️  Error searching '{skill}': {str(e)[:100]}", exc_info=True)
+            logging.error(f"  Error searching '{skill}': {str(e)[:100]}", exc_info=True)
             return skill, {
                 "urls": [],
                 "source": "error",
@@ -228,8 +228,7 @@ def test_source_discoverer_agent(skills_from_agent1: list):
     tasks = InterviewPrepTasks()
     
     tools = {
-        "google_search_tool": google_search_tool,
-        "smart_web_content_extractor": smart_web_content_extractor,
+        "google_search_tool": google_search_tool
     }
     
     source_discoverer = agents.source_discoverer_agent(tools)
@@ -279,7 +278,7 @@ def test_source_discoverer_agent(skills_from_agent1: list):
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(clean_output, f, indent=2, ensure_ascii=False)  # type: ignore
     
-    logging.info(f"\n✅ Results saved to: {output_path}")
+    logging.info(f"\n Results saved to: {output_path}")
     logging.info(f"{'='*80}\n")
     
     return output_data

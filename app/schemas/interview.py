@@ -24,4 +24,4 @@ class InterviewQuestions(BaseModel):
     questions: List[str] = Field(description="A list of insightful interview questions for this skill.")
 
 class AllInterviewQuestions(BaseModel):
-    all_questions: List[InterviewQuestions] = Field(description="A list of all skills with their generated questions.")
+    all_questions: List["InterviewQuestions"] = Field(description="A list of all skills with their generated questions.")

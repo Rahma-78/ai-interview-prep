@@ -11,7 +11,7 @@ This module provides utility functions for:
 
 
 
-def _optimize_search_query(skill: str) -> str:
+def optimize_search_query(skill: str) -> str:
     """
     Generates an effective Google search query for technical interview questions.
 
@@ -23,15 +23,15 @@ def _optimize_search_query(skill: str) -> str:
     """
     skill = skill.strip().lower()
     # Core phrase for direct, relevant results
-    base = f'"{skill} interview questions"'
+    base = f'{skill} interview questions'
     # Exclude common video platforms to focus on textual content
     exclude = "-youtube -vimeo -tiktok"
-    # Combine for a more precise search
+    # Combine for a more effective search
     query = f"{base} {exclude}"
     return query
 
 
-def _generate_fallback_results(search_query: str) -> str:
+def generate_fallback_results(search_query: str) -> str:
     """
     Generates fallback results when the primary search API fails.
 

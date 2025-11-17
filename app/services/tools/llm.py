@@ -1,5 +1,7 @@
-from app.core.config import settings
+# 1. Removed all os and load_dotenv imports
 from crewai.llm import LLM
+# 2. Import the centralized settings object
+from app.core.config import settings
 
 """
 Language Model (LLM) configuration and initialization.
@@ -10,21 +12,14 @@ This module provides:
 - Consistent temperature and API key handling
 """
 
+def get_llm(model: str , temperature: float = 0.1, api_key: str | None = None):
+    """Initializes and returns an LLM instance."""
 
-def get_llm(model: str, temperature: float = 0.1, api_key: str | None = None) -> LLM:
-    """
-    Retrieves an LLM instance from CrewAI.
-
-    Args:
-        model (str): The name of the LLM model to use.
-        temperature (float): The temperature setting for the LLM.
-        api_key (str | None): The API key for the LLM service.
-
-    Returns:
-        LLM: An instance of the CrewAI LLM.
-    """
     return LLM(model=model, temperature=temperature, api_key=api_key)
 
+
+# 4. Use the 'settings' object to get API keys.
+# No more manual checks are needed.
 
 # 1. Gemini Flash - For content extraction
 llm_gemini_flash = get_llm("gemini/gemini-2.5-flash",
@@ -44,5 +39,3 @@ llm_openrouter = get_llm(
     temperature=0.7,
     api_key=settings.OPENROUTER_API_KEY
 )
-
-
