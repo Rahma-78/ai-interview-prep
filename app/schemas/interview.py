@@ -1,20 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict
 
-class InterviewQuestion(BaseModel):
-    skill: str
-    query: str | None = None
-    sources: List[Dict] | None = None
-    questions: List[str] | None = None
-    isLoading: bool = False # Changed to False as processing will be done by backend
-    error: str | None = None
-
 class ExtractedSkills(BaseModel):
     skills: List[str] = Field(description="A list of technical skills found in the resume.")
 
 class SkillSources(BaseModel):
     skill: str = Field(description="The technical skill.")
-    sources: List[str] = Field(description="A list of authoritative web sources (URIs) for this skill.")
+    sources: List[Dict] = Field(description="A list of sources with URL and interview question content.")
+    questions: List[str] = Field(description="A list of actual interview questions found.")
+    extracted_content: str = Field(description="A summary of key themes and patterns found across sources.")
 
 class AllSkillSources(BaseModel):
     all_sources: List[SkillSources] = Field(description="A list of all skills with their sources.")

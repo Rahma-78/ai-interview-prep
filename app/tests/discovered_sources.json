@@ -1,22 +1,115 @@
 {
-  "Python": [
-    "https://www.geeksforgeeks.org/python/python-interview-questions/",
-    "https://www.datacamp.com/blog/top-python-interview-questions-and-answers",
-    "https://mimo.org/blog/python-interview-questions",
-    "https://www.reddit.com/r/Python/comments/1knw7z/python_interview_questions/",
-    "https://www.simplilearn.com/python-interview-questions-article",
-    "https://dataengineeracademy.com/module/100-python-interview-questions-for-data-science-and-engineering-master-your-skills-updated-2025/",
-    "https://www.coursereport.com/blog/the-top-3-python-interview-questions-and-how-to-answer-them-with-coding-temple",
-    "https://codefinity.com/blog/Top-50-Python-Interview-Questions-for-Data-Analyst"
-  ],
-  "Machine Learning": [
-    "https://www.geeksforgeeks.org/machine-learning/machine-learning-interview-questions/",
-    "https://www.interviewbit.com/machine-learning-interview-questions/",
-    "https://github.com/andrewekhalel/MLQuestions",
-    "https://medium.com/edureka/machine-learning-interview-questions-a5aef8a3ca60",
-    "https://www.reddit.com/r/learnmachinelearning/comments/j4avq5/i_created_a_complete_overview_of_machine_learning/",
-    "https://www.igmguru.com/blog/machine-learning-interview-questions",
-    "https://www.analyticsvidhya.com/blog/2024/01/ml-interview-questions/",
-    "https://ai.org.tr/wp-content/uploads/2022/10/10-41-Essential-Machine-Learning-Interview-Questions-.pdf"
+  "all_sources": [
+    {
+      "skill": "Python",
+      "sources": [
+        {
+          "url": "https://realpython.com/python-interview-questions/",
+          "title": "Python Interview Questions and Answers",
+          "content": "Prepare for your next Python interview with this comprehensive guide to common questions and detailed answers covering core concepts, data structures, algorithms, and more. Real Python offers high-quality tutorials and learning paths."
+        },
+        {
+          "url": "https://www.geeksforgeeks.org/python-interview-questions/",
+          "title": "Python Interview Questions and Answers",
+          "content": "A curated list of frequently asked Python interview questions for freshers and experienced professionals, covering fundamental concepts, OOPs, data structures, and advanced topics with detailed explanations."
+        },
+        {
+          "url": "https://www.interviewbit.com/python-interview-questions/",
+          "title": "Python Interview Questions",
+          "content": "Comprehensive list of Python interview questions with solutions, categorized by difficulty and topic, to help you ace your next technical interview. Includes questions on core Python, OOP, data structures, and algorithms."
+        },
+        {
+          "url": "https://www.programiz.com/python-programming/interview-questions",
+          "title": "Python Interview Questions",
+          "content": "Explore a collection of Python interview questions and answers, designed to test your understanding of Python fundamentals, data types, functions, and object-oriented programming with clear examples."
+        },
+        {
+          "url": "https://www.freecodecamp.org/news/python-interview-questions-and-answers/",
+          "title": "Python Interview Questions and Answers for Beginners and Experienced Developers",
+          "content": "A detailed guide covering essential Python interview questions, from basic syntax to advanced topics like decorators and generators, with clear explanations and code snippets."
+        },
+        {
+          "url": "https://www.educative.io/blog/python-interview-questions",
+          "title": "Top 50 Python Interview Questions and Answers",
+          "content": "Prepare for your Python interview with this list of 50 common questions, including explanations for core concepts, data structures, and object-oriented programming, often with interactive examples."
+        },
+        {
+          "url": "https://docs.python.org/3/tutorial/",
+          "title": "The Python Tutorial",
+          "content": "The official Python tutorial provides an authoritative introduction to the basic features and concepts of the Python language and system, serving as a foundational learning resource for understanding core mechanics."
+        },
+        {
+          "url": "https://www.datacamp.com/blog/python-interview-questions-and-answers",
+          "title": "Python Interview Questions and Answers",
+          "content": "DataCamp provides a list of common Python interview questions, focusing on practical applications and theoretical understanding, suitable for various experience levels."
+        }
+      ],
+      "questions": [
+        "Explain the difference between a list and a tuple in Python. When would you choose one over the other?",
+        "What is the Python Global Interpreter Lock (GIL)? How does it affect multi-threading in Python, and what are common workarounds?",
+        "Describe decorators in Python. Provide an example of how to create and use a decorator, and explain a practical use case.",
+        "What are generators and iterators in Python? How do they differ, and when would you use them to optimize memory or performance?",
+        "Explain the concept of context managers in Python. How do you implement them using `with` statements, and what is the role of the `contextlib` module?",
+        "How does Python's memory management work? Discuss garbage collection mechanisms, including reference counting and cyclic garbage collection.",
+        "What is the difference between `__init__` and `__new__` methods in Python classes? When would you use `__new__`?",
+        "Explain method overloading and method overriding in Python. Does Python support true method overloading, and if not, how is similar functionality achieved?",
+        "What is the purpose of `*args` and `**kwargs` in function definitions? Provide examples of their use.",
+        "Discuss the differences between the `is` and `==` operators in Python. When would you use each, and what do they check for?"
+      ],
+      "extracted_content": ""
+    },
+    {
+      "skill": "Machine Learning",
+      "sources": [
+        {
+          "url": "https://www.geeksforgeeks.org/machine-learning-interview-questions/",
+          "title": "Top 50 Machine Learning Interview Questions & Answers",
+          "content": "GeeksforGeeks provides a comprehensive list of frequently asked Machine Learning interview questions, covering fundamental concepts, algorithms, model evaluation, and practical scenarios. It's a great resource for both freshers and experienced professionals."
+        },
+        {
+          "url": "https://towardsdatascience.com/120-machine-learning-interview-questions-and-answers-for-2024-f7220038487b",
+          "title": "120+ Machine Learning Interview Questions and Answers for 2024",
+          "content": "This Towards Data Science article offers an extensive collection of ML interview questions, ranging from basic definitions to advanced topics like deep learning, MLOps, and system design, with detailed explanations."
+        },
+        {
+          "url": "https://www.interviewbit.com/machine-learning-interview-questions/",
+          "title": "Machine Learning Interview Questions",
+          "content": "InterviewBit offers a structured set of Machine Learning interview questions with clear answers, designed to help candidates prepare for technical interviews at top tech companies. It covers core ML concepts and practical applications."
+        },
+        {
+          "url": "https://www.coursera.org/articles/machine-learning-interview-questions",
+          "title": "Machine Learning Interview Questions: A Guide",
+          "content": "The Coursera blog provides a guide to common Machine Learning interview questions, offering insights into what interviewers look for and how to approach different types of questions, from theoretical to practical."
+        },
+        {
+          "url": "https://www.analyticsvidhya.com/blog/2023/08/machine-learning-interview-questions/",
+          "title": "Top 50 Machine Learning Interview Questions",
+          "content": "Analytics Vidhya presents a curated list of Machine Learning interview questions, covering essential algorithms, data preprocessing, model evaluation metrics, and common challenges faced in ML projects."
+        },
+        {
+          "url": "https://developers.google.com/machine-learning/crash-course",
+          "title": "Machine Learning Crash Course with TensorFlow APIs",
+          "content": "Google's Machine Learning Crash Course offers extensive text-based documentation and exercises to build a strong foundation in core ML concepts, algorithms, and best practices, which is invaluable for technical interviews."
+        },
+        {
+          "url": "https://developer.ibm.com/articles/machine-learning-interview-questions-and-answers/",
+          "title": "Machine learning interview questions and answers",
+          "content": "IBM Developer provides a set of machine learning interview questions and answers, focusing on key concepts, algorithms, and practical considerations relevant to enterprise-level ML applications."
+        }
+      ],
+      "questions": [
+        "What is the difference between supervised, unsupervised, and reinforcement learning? Provide an example for each.",
+        "Explain the bias-variance trade-off in machine learning. How does it relate to model complexity?",
+        "Describe the working principle of a Support Vector Machine (SVM). What is the role of the kernel trick?",
+        "What is Gradient Descent? Explain its different variants (Batch, Stochastic, Mini-batch) and their trade-offs.",
+        "Define precision, recall, F1-score, and accuracy. In what scenarios would you prioritize one metric over the others?",
+        "How do you handle overfitting and underfitting in a machine learning model? List several techniques for each.",
+        "What are regularization techniques (L1 and L2), and how do they help prevent overfitting?",
+        "Explain the concept of cross-validation. Why is it important, and what are its common types?",
+        "How would you approach a problem where your dataset has a significant number of missing values?",
+        "Discuss the components of a typical machine learning pipeline, from data ingestion to model deployment."
+      ],
+      "extracted_content": "The provided sources and questions highlight several key themes and patterns in Machine Learning technical interviews and learning resources. There's a strong emphasis on foundational concepts, including the different types of machine learning (supervised, unsupervised, reinforcement learning) and core algorithms like Support Vector Machines and Gradient Descent. A significant portion of the content focuses on model evaluation and improvement, covering topics such as the bias-variance trade-off, metrics like precision, recall, F1-score, and accuracy, and techniques to combat overfitting and underfitting, including regularization and cross-validation. Practical aspects of machine learning are also prominent, with questions addressing data preprocessing (e.g., handling missing values) and the overall machine learning pipeline from data ingestion to model deployment. Advanced topics like deep learning, MLOps, and system design are also mentioned, indicating a need for a broad understanding of the field. The resources cater to both theoretical understanding and practical application, preparing candidates for a range of technical interview scenarios."
+    }
   ]
 }

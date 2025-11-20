@@ -1,41 +1,120 @@
+"""
+This module defines a collection of CrewAI tools for the interview preparation agent.
+These tools are responsible for file processing, discovering interview sources, and generating questions.
+"""
+
+# Standard Library Imports
 import asyncio
 import json
 import logging
 import os
-from typing import List, Optional
-from requests.exceptions import RequestException
-import httpx
+import re
+from pathlib import Path
+from typing import List, Dict, Any
+
+# Third-Party Imports
 import PyPDF2
-from bs4 import BeautifulSoup
 from crewai.tools import tool
 from dotenv import load_dotenv
 
+# Application-Specific Imports
 from app.schemas.interview import (
-    AllSkillSources,
     InterviewQuestions,
     AllInterviewQuestions,
-    SkillSources,
 )
 from app.services.tools.helpers import (
     generate_fallback_results,
     optimize_search_query,
 )
-from app.services.tools.llm import llm_gemini_flash, llm_openrouter
-from app.services.tools.search_tool import get_serper_tool
-from app.services.tools.utils import  async_rate_limiter
+from app.services.tools.llm_config import llm_openrouter, llm_gemini_flash
+from app.services.tools.utils import async_rate_limiter
 
-# Configure logging and load environment variables first
-from pathlib import Path
+# --- Configuration ---
+
+# Load environment variables from the specified .env file
 load_dotenv(Path(__file__).resolve().parent.parent.parent / 'core' / '.env')
+
+# Configure logging for the module
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-
 logger = logging.getLogger(__name__)
 
-# Initialize SerperDevTool after environment variables are loaded
-_serper_tool = get_serper_tool()
+
+# --- Helper Functions ---
+
+def _extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
+    """
+    Extracts grounding metadata with URI and title from Gemini's native search results.
+
+    Args:
+        response_text: The LLM response text that may contain grounding metadata.
+
+    Returns:
+        A list of dictionaries, each containing the 'url', 'title', and empty 'content'.
+    """
+    grounding_sources = []
+    try:
+        if 'groundingMetadata' in response_text:
+            grounding_pattern = r'"groundingMetadata":\s*{[^}]*"web":\s*\[[^\]]*\]'
+            grounding_match = re.search(grounding_pattern, response_text, re.DOTALL)
+
+            if grounding_match:
+                web_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"'
+                web_matches = re.findall(web_pattern, grounding_match.group(0))
+
+                for uri, title in web_matches:
+                    if uri and title:
+                        grounding_sources.append({
+                            "url": uri,
+                            "title": title,
+                            "content": ""
+                        })
+    except Exception as e:
+        logger.warning(f"Could not extract grounding metadata: {e}")
+    return grounding_sources
+
+
+def _clean_and_parse_json(json_string: str) -> Dict[str, Any]:
+    """
+    Cleans and parses a JSON string, removing markdown and fixing common formatting issues.
+
+    Args:
+        json_string: The raw string to be parsed.
+
+    Returns:
+        A dictionary parsed from the JSON string.
+    """
+    # Remove markdown code block fences
+    if json_string.startswith('```json'):
+        json_string = json_string[7:]
+    if json_string.endswith('```'):
+        json_string = json_string[:-3]
+
+    # Fix common JSON formatting issues like trailing commas
+    json_string = json_string.strip()
+    json_string = json_string.replace(',]', ']').replace(',}', '}')
+
+    return json.loads(json_string)
+
+
+def _format_discovery_result(skill: str, sources: List[Dict], questions: List[str], content: str) -> str:
+    """
+    Formats the discovered sources, questions, and content into the final JSON structure.
+    """
+    result_data = {
+        "all_sources": [{
+            "skill": skill,
+            "sources": sources,
+            "questions": questions,
+            "extracted_content": content[:2000] if content else ""
+        }]
+    }
+    return json.dumps(result_data)
+
+
+# --- CrewAI Tools ---
 
 @tool
 def file_text_extractor(file_path: str) -> str:
@@ -46,25 +125,20 @@ def file_text_extractor(file_path: str) -> str:
         file_path: The path to the PDF file.
 
     Returns:
-        The extracted text content from the PDF, or an error message.
+        The extracted text content from the PDF, or an error message if an issue occurs.
     """
     try:
         _, file_extension = os.path.splitext(file_path)
-        file_extension = file_extension.lower()
-
-        if file_extension != ".pdf":
+        if file_extension.lower() != ".pdf":
             logger.warning(f"Unsupported file type: {file_extension}. Only PDF files are supported.")
             return f"Unsupported file type: {file_extension}. Only PDF files are supported."
 
         with open(file_path, "rb") as file:
             reader = PyPDF2.PdfReader(file)
             text = "".join(page.extract_text() for page in reader.pages)
-            logger.info(f"Extracted text length: {len(text)}")
-            return (
-                text
-                if text
-                else "Error: No text could be extracted from the PDF."
-            )
+            logger.info(f"Successfully extracted {len(text)} characters from {file_path}")
+            return text if text else "Error: No text could be extracted from the PDF."
+
     except FileNotFoundError:
         logger.error(f"File not found: {file_path}")
         return f"Error: The file at {file_path} was not found."
@@ -74,186 +148,183 @@ def file_text_extractor(file_path: str) -> str:
     except Exception as e:
         logger.error(f"Unexpected error in file_text_extractor for {file_path}: {e}", exc_info=True)
         return f"An error occurred while reading the PDF: {str(e)}"
-    
-@tool
-async def google_search_tool(
-    search_query: str,
-    max_retries: int = 3,
-    initial_delay: float = 2.0
-) -> str:
-    """
-    Performs an ASYNCHRONOUS Google search with optimized caching, retries,
-    and error handling.
-    """
-    try:
-        optimized_query = optimize_search_query(search_query)
-    except Exception as e:
-        logger.error(f"Query optimization failed for '{search_query}': {e}. Using original.")
-        optimized_query = search_query
 
+
+@tool
+async def grounded_source_discoverer(search_query: str, max_retries: int = 3, initial_delay: float = 2.0) -> str:
+    """
+    Asynchronously discovers technical interview questions and sources using Gemini's native search grounding.
+    It handles retries, rate limiting, and formats the output.
+    """
     retry_delay = initial_delay
+    optimized_query = optimize_search_query(search_query)
     
     for attempt in range(max_retries):
         try:
-            # 4. Await the rate limiter
-            await async_rate_limiter.wait_if_needed() 
-            logger.info(
-                f" Searching: '{optimized_query}' (Attempt {attempt + 1}/{max_retries})"
-            )
+            await async_rate_limiter.wait_if_needed()
+            logger.info(f"Discovering sources for '{search_query}' using Gemini native search (Attempt {attempt + 1}/{max_retries})")
 
-            # 5. Await the async tool method
-            # CORRECT: Awaiting the asynchronous function
-            # This runs the blocking .run() function in a separate thread,
-# awaits the thread's completion, and returns the result—all
-# without blocking the main asyncio loop.
-            raw_result = await asyncio.to_thread(
-                _serper_tool.run, 
-                search_query=optimized_query
-            )
-                                    
-            # 6. FIXED: Await the async record_request method
-            await async_rate_limiter.record_request()
-
-            parsed_result = (
-                json.loads(raw_result)
-                if isinstance(raw_result, str)
-                else raw_result
-            )
-
-            result_uris = []
-            for item in parsed_result.get("organic", []):
-                link = item.get("link")
-                if link and link.strip():
-                    result_uris.append(link.strip())
-
-            formatted_result = AllSkillSources(
-                all_sources=[
-                SkillSources(skill=optimized_query, sources=result_uris)
-                ]
-            ).json()
-
-        
-            return formatted_result
-
-        except (RequestException, json.JSONDecodeError, KeyError, TypeError) as e:
-            logger.error(f"Search attempt {attempt + 1} failed for '{optimized_query}': {type(e).__name__}: {e}")
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay}s...")
-                await asyncio.sleep(retry_delay) 
-                retry_delay *= 2
+            # Use Gemini's native search grounding
+            search_prompt = f"""
+            Find high-quality technical interview questions and learning resources for '{optimized_query}'.
             
-    else:
-        logger.warning(f"All search retries failed for '{optimized_query}'. Using fallback.")
-        
-        # 7. Check if your fallback is also async
-        # If _generate_fallback_results is async, it needs 'await'
-        # If it's a normal sync function, this is fine.
-        return generate_fallback_results(optimized_query)
-@tool
-def smart_web_content_extractor(
-    search_query: str, urls: Optional[List[str]] = None
-) -> str:
-    """
-    Extracts relevant content from a list of URLs based on a query.
-    """
-    if not urls:
-        return "No URLs provided for content extraction."
-
-    try:
-        # Create a dummy SkillSources object to conform to AllSkillSources schema
-        skill_sources_obj = SkillSources(skill=search_query, sources=urls)
-        all_skill_sources = AllSkillSources(all_sources=[skill_sources_obj])#
-    except Exception as e:
-        logger.error(f"Error processing URLs for '{search_query}': {e}", exc_info=True)
-        return f"Error: Could not process URLs for '{search_query}': {str(e)}"
-
-    urls_to_extract = [
-        uri
-        for item in all_skill_sources.all_sources
-        for uri in item.sources
-    ][:8]
-
-    async def fetch_and_process(url: str) -> Optional[str]:
-        if not url.startswith("http"):
-            return None
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, timeout=15)
-                response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            text_content = " ".join(soup.stripped_strings)
-            if not text_content or len(text_content) < 100:
-                return None
-
-            prompt = f"""From the following content about "{search_query}", extract the most relevant information.
-            Focus on key concepts and practical insights. Max 200 words.
-            Content: \"\"\"{text_content[:6000]}\"\"\"
+            Search for authoritative sources like tutorials, educational websites, documentation, and interview question websites.
+            Focus on text-based content (articles, documentation, Q&A sites, blogs, guides).
+            
+            Return a JSON object with the following structure:
+            {{
+                "sources": [
+                    {{
+                        "url": "https://example.com",
+                        "title": "Source Title",
+                        "content": "Brief content snippet"
+                    }}
+                ],
+                "questions": [
+                    "Question 1 about {optimized_query}",
+                    "Question 2 about {optimized_query}"
+                ]
+            }}
+            
+            Include 5-10 high-quality sources and 10 technical interview questions.
+            Use Google Search grounding to find relevant information.
             """
-            llm_response = llm_gemini_flash.call(
-                messages=[{"role": "user", "content": prompt}]
+            
+            # Call Gemini with search tool enabled
+            search_response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    llm_gemini_flash.call,
+                    messages=[{"role": "user", "content": search_prompt}]
+                ),
+                timeout=30.0
             )
-            return f"Source: {url}\n{llm_response}\n" if llm_response else None
+            await async_rate_limiter.record_request()
+            
+            logger.info(f"Raw search response for '{search_query}': {str(search_response)[:500]}...")
+
+            # Extract grounding metadata from Gemini's response
+            sources = []
+            questions = []
+            
+            try:
+                # First, try to parse the response as JSON directly
+                response_data = _clean_and_parse_json(search_response)
+                
+                # Extract sources
+                if 'sources' in response_data:
+                    for source in response_data['sources'][:10]:  # Top 10 results
+                        sources.append({
+                            "url": source.get('url', ''),
+                            "title": source.get('title', ''),
+                            "content": source.get('content', '')[:500]
+                        })
+                
+                # Extract questions
+                if 'questions' in response_data:
+                    questions = response_data['questions'][:10]  # Top 10 questions
+                
+                # If no questions found, try to extract from grounding metadata
+                if not questions:
+                    grounding_sources = _extract_grounding_sources(search_response)
+                    sources.extend(grounding_sources)
+                    
+                    # Generate questions if we have sources but no questions
+                    if sources and not questions:
+                        questions_prompt = f"""Based on the following sources about {optimized_query},
+                        generate 10 technical interview questions. Return only valid JSON with "questions" array.
+                        
+                        Sources: {json.dumps(sources[:5], indent=2)}
+                        
+                        Return format: {{"questions": ["question1", "question2", ...]}}"""
+                        
+                        questions_response = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                llm_gemini_flash.call,
+                                messages=[{"role": "user", "content": questions_prompt}]
+                            ),
+                            timeout=30.0
+                        )
+                        
+                        questions_data = _clean_and_parse_json(questions_response)
+                        questions = questions_data.get("questions", [])
+                
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try to extract from grounding metadata
+                logger.warning(f"JSON parsing failed for '{search_query}', extracting from grounding metadata")
+                grounding_sources = _extract_grounding_sources(search_response)
+                sources.extend(grounding_sources)
+                
+                # Generate questions if we have sources
+                if sources:
+                    questions_prompt = f"""Based on the following sources about {optimized_query},
+                    generate 10 technical interview questions. Return only valid JSON with "questions" array.
+                    
+                    Sources: {json.dumps(sources[:5], indent=2)}
+                    
+                    Return format: {{"questions": ["question1", "question2", ...]}}"""
+                    
+                    questions_response = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            llm_gemini_flash.call,
+                            messages=[{"role": "user", "content": questions_prompt}]
+                        ),
+                        timeout=30.0
+                    )
+                    
+                    questions_data = _clean_and_parse_json(questions_response)
+                    questions = questions_data.get("questions", [])
+
+            logger.info(f"Successfully discovered {len(questions)} questions and {len(sources)} sources for '{search_query}'")
+            
+            return _format_discovery_result(search_query, sources, questions, "")
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Search call timed out for '{search_query}' on attempt {attempt + 1}")
         except Exception as e:
-            logger.warning(f"Error processing {url}: {e}")
-            return None
+            logger.error(f"Search call failed for '{search_query}': {e}")
+            if "quota" in str(e).lower() or "rate" in str(e).lower():
+                logger.info(f"Rate limiting detected for '{search_query}', marking quota exhausted.")
+                await async_rate_limiter.mark_quota_exhausted(retry_after_seconds=60)
 
-    # Run async function in sync context
-    try:
-        loop = asyncio.get_event_loop()
-        tasks = [fetch_and_process(url) for url in urls_to_extract]
-        results = loop.run_until_complete(asyncio.gather(*tasks))
-        combined_content = [res for res in results if res]
+        # Exponential backoff before retrying
+        if attempt < max_retries - 1:
+            await asyncio.sleep(retry_delay)
+            retry_delay *= 2
 
-        if not combined_content:
-            return f"Could not extract relevant content for '{search_query}'."
-
-        return f"Extracted content from {len(combined_content)} sources:\n\n" + "\n".join(
-            combined_content
-        )
-    except RuntimeError as e:
-        if " asyncio.get_event_loop() " in str(e):
-            # Event loop not running, create a new one
-            return f"Could not extract content due to async event loop issue for '{search_query}'."
-        else:
-            raise
+    logger.error(f"All search retries failed for '{search_query}'.")
+    return generate_fallback_results(search_query)
 
 
 @tool
 def question_generator(skill: str, sources_content: str) -> str:
     """
-    Generates interview questions based on provided skill and content.
+    Generates interview questions based on a provided skill and contextual content.
+
+    Args:
+        skill: The technical skill to generate questions for.
+        sources_content: The context to use for generating questions.
+
+    Returns:
+        A JSON string containing the generated questions or an error message.
+    """
+    prompt = f"""As an expert interviewer, generate insightful, non-coding questions for a candidate skilled in "{skill}",
+    based ONLY on the provided Context.
+    Context: {sources_content}
+    Respond with a single, valid JSON object with a "questions" key, which is an array of unique strings.
     """
     try:
-        prompt = f"""As an expert interviewer, generate insightful, non-coding questions for a candidate skilled in "{skill}",
-        based ONLY on the provided Context.
-        Context: {sources_content}
-        Respond with a single, valid JSON object with a "questions" key, which is an array of unique strings.
-        """
         llm_response = llm_openrouter.call(
             messages=[{"role": "user", "content": prompt}]
         )
-        # Assuming llm_response is a string containing valid JSON
         questions_data = json.loads(llm_response)
         questions_list = questions_data.get("questions", [])
 
-        interview_questions = InterviewQuestions(
-            skill=skill, questions=questions_list
-        )
-        return AllInterviewQuestions(
-            all_questions=[interview_questions]
-        ).json()
+        interview_questions = InterviewQuestions(skill=skill, questions=questions_list)
+        return AllInterviewQuestions(all_questions=[interview_questions]).json()
+
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error while generating questions for '{skill}': {e}", exc_info=True)
-        return json.dumps({
-            "skill": skill,
-            "questions": [],
-            "error": f"Failed to parse LLM response as JSON: {str(e)}"
-        })
+        logger.error(f"JSON parsing error for '{skill}': {e}", exc_info=True)
+        return json.dumps({"skill": skill, "questions": [], "error": f"Failed to parse LLM response: {e}"})
     except Exception as e:
         logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
-        return json.dumps({
-            "skill": skill,
-            "questions": [],
-            "error": f"Question generation failed: {str(e)}"
-        })
+        return json.dumps({"skill": skill, "questions": [], "error": f"Question generation failed: {e}"})

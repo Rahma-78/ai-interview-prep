@@ -11,9 +11,9 @@ from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import (
     file_text_extractor,
-    google_search_tool,
+   grounded_source_discoverer,
     question_generator,
-    smart_web_content_extractor,
+   
 )
 from app.core.config import settings # Import settings
 
@@ -26,8 +26,7 @@ class InterviewPrepCrew:
         self.agents = InterviewPrepAgents()
         self.tools = {
             "file_text_extractor": file_text_extractor,
-            "google_search_tool": google_search_tool,
-            "smart_web_content_extractor": smart_web_content_extractor,
+            "grounded_source_discoverer": grounded_source_discoverer,
             "question_generator": question_generator
         }
         self.tasks = InterviewPrepTasks()
@@ -45,17 +44,16 @@ class InterviewPrepCrew:
             question_generator_agent = self.agents.question_generator_agent(self.tools)
             
             skills_task = self.tasks.extract_skills_task(resume_analyzer, self.file_path)
-            search_task = self.tasks.search_sources_task(source_discoverer, "{extract_skills_task}")
-            extract_task = self.tasks.extract_web_content_task(source_discoverer, urls_reference="{search_sources_task}", skill="{extract_skills_task}")
-            question_task = self.tasks.generate_questions_task(question_generator_agent, "{extract_skills_task}", sources_content="{extract_web_content_task}")
+            discover_task = self.tasks.discover_and_extract_content_task(source_discoverer, "{extract_skills_task}")
+            question_task = self.tasks.generate_questions_task(question_generator_agent, "{extract_skills_task}", sources_content="{discover_and_extract_content_task}")
 
             full_crew = CrewAI(
                 agents=[resume_analyzer, source_discoverer, question_generator_agent],
-                tasks=[skills_task, search_task, extract_task, question_task],
+                tasks=[skills_task, discover_task, question_task],
                 process=Process.sequential,
                 verbose=settings.DEBUG_MODE, # Use DEBUG_MODE for verbose output
             )
-            
+        
             crew_result = await full_crew.kickoff_async()
             
             try:

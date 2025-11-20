@@ -12,10 +12,10 @@ This module provides:
 - Consistent temperature and API key handling
 """
 
-def get_llm(model: str , temperature: float = 0.1, api_key: str | None = None):
+def get_llm(model: str , temperature: float = 0.1, api_key: str | None = None, **kwargs):
     """Initializes and returns an LLM instance."""
 
-    return LLM(model=model, temperature=temperature, api_key=api_key)
+    return LLM(model=model, temperature=temperature, api_key=api_key, **kwargs)
 
 
 # 4. Use the 'settings' object to get API keys.
@@ -24,7 +24,8 @@ def get_llm(model: str , temperature: float = 0.1, api_key: str | None = None):
 # 1. Gemini Flash - For content extraction
 llm_gemini_flash = get_llm("gemini/gemini-2.5-flash",
                            temperature=0.1,
-                           api_key=settings.GEMINI_API_KEY)
+                           api_key=settings.GEMINI_API_KEY,
+                           tools=['search']) # Enable search grounding
 
 # 2. Groq Llama - For skill extraction
 llm_groq = get_llm(

@@ -1,285 +1,249 @@
+
 import asyncio
 import json
 import logging
 import os
 import sys
-import time
-from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from crewai import Crew as CrewAI, Process
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from app.schemas.interview import AllSkillSources, SkillSources
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
-from app.services.tools.tools import google_search_tool, smart_web_content_extractor
+from app.services.tools.tools import grounded_source_discoverer
+from app.schemas.interview import AllSkillSources
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-# ============================================================================
-# OPTIMIZATION UTILITIES - DYNAMIC BASED ON INPUT
-# ============================================================================
-
-# Global cache for URL searches (persists during session)
-SEARCH_CACHE: Dict[str, Dict] = {}
-
-# Request throttling configuration
-REQUEST_DELAY_SECONDS = 3  # Conservative delay between requests
-MAX_SKILLS_PER_RUN = 5     # Process in small batches
-MAX_URLS_PER_SKILL = 8     # Increased from 3 to 8 for better coverage
-QUALITY_SCORE_THRESHOLD = 0  # We'll use all URLs since they come from search
-
-
-# ============================================================================
-# ASYNC & GENERATOR-BASED OPTIMIZATION UTILITIES
-# ============================================================================
-
-def deduplicate_skills(skills: List[str]) -> tuple[List[str], Dict]:
-    """
-    Remove duplicate skills from input list (simple case-insensitive comparison).
-    Works directly with structured input from Agent 1.
-    
-    Returns:
-        tuple: (deduplicated_skills, removal_map)
-    """
-    seen = {}  # Maps lowercase skill to original capitalization
-    filtered = []
-    duplicates_found = []
-    
-    for skill in skills:
-        skill_lower = skill.lower().strip()
-        if skill_lower not in seen:
-            seen[skill_lower] = skill
-            filtered.append(skill)
-        else:
-            duplicates_found.append((skill, seen[skill_lower]))
-    
-    if duplicates_found:
-        logging.info(f"\n🔍 Deduplication: {len(skills)} → {len(filtered)} skills")
-        logging.info(f"   Removed {len(duplicates_found)} duplicates")
-        for dup, canonical in duplicates_found:
-            logging.info(f"     '{dup}' → '{canonical}'")
-    
-    return filtered, {"duplicates_found": duplicates_found, "original_count": len(skills)}
-
-
-async def async_search_skill(skill: str, tasks, source_discoverer, semaphore, delay: float) -> Tuple[str, Dict]:
-    """
-    Async I/O operation for searching a single skill.
-    Uses semaphore to prevent overwhelming the LLM API.
-    Includes adaptive delay to respect rate limits.
-    
-    Args:
-        skill: Skill to search
-        tasks: Task generator
-        source_discoverer: Agent instance
-        semaphore: Async semaphore for rate limiting
-        delay: Delay in seconds before making request
-    
-    Returns:
-        Tuple of (skill, result_dict)
-    """
-    async with semaphore:
-        if delay > 0:
-            logging.info(f"   ⏳ Waiting {delay:.1f}s before searching '{skill}'...")
-            await asyncio.sleep(delay)
-        
-        try:
-            search_task = tasks.search_sources_task(source_discoverer, skill)
-            search_crew = CrewAI(
-                agents=[source_discoverer],
-                tasks=[search_task],
-                process=Process.sequential
-            )
-            
-            search_result = await search_crew.kickoff_async()
-            
-            urls = []
-            # The search_result is a CrewOutput object; its .raw attribute contains the raw JSON string.
-            # We parse this raw string and the pydantic model handles validation.
-            parsed_result = AllSkillSources(**json.loads(search_result.raw))
-            for skill_source_item in parsed_result.all_sources:
-                if skill_source_item.skill.lower() == skill.lower():
-                    urls = [uri for uri in skill_source_item.sources]
-                    break
-            
-            logging.debug(f"Successfully parsed and extracted {len(urls)} URLs for skill '{skill}'")
-            
-            return skill, {
-                "urls": urls[:MAX_URLS_PER_SKILL],
-                "source": "llm_search",
-                "status": "success" if urls else "no_urls",
-                "urls_found_count": len(urls)
-            }
-        
-        except Exception as e:
-            logging.error(f"  Error searching '{skill}': {str(e)[:100]}", exc_info=True)
-            return skill, {
-                "urls": [],
-                "source": "error",
-                "status": "failed",
-                "error": str(e)
-            }
-
-
-async def process_skills_async(
-    unique_skills: List[str],
-    tasks,
-    source_discoverer,
-    max_concurrent: int = 1
-) -> Dict[str, Dict]:
-    """
-    Async processor for skills using concurrency control with smart batching.
-    
-    Args:
-        unique_skills: List of skills to process
-        tasks: Task generator
-        source_discoverer: Agent instance
-        max_concurrent: Max concurrent LLM requests (reduced for quota management)
-    
-    Returns:
-        Dictionary of results for each skill
-    """
-    semaphore = asyncio.Semaphore(max_concurrent)
-    results = {}
-    
-    batch_size = min(MAX_SKILLS_PER_RUN, len(unique_skills))
-    
-    for batch_start in range(0, len(unique_skills), batch_size):
-        batch_end = min(batch_start + batch_size, len(unique_skills))
-        batch = unique_skills[batch_start:batch_end]
-        
-        logging.info(f"\n📦 Processing batch {batch_start // batch_size + 1}")
-        logging.info(f"   Skills {batch_start + 1}-{batch_end} of {len(unique_skills)}")
-        logging.info(f"{'='*80}\n")
-        
-        tasks_list = []
-        
-        for idx, skill in enumerate(batch):
-            if skill in SEARCH_CACHE:
-                logging.info(f"🔍 [{idx + 1}/{len(batch)}] Cache hit: {skill}")
-                results[skill] = SEARCH_CACHE[skill]
-                continue
-            
-            logging.info(f"🔍 [{idx + 1}/{len(batch)}] Queued: {skill}")
-            
-            delay = REQUEST_DELAY_SECONDS * idx
-            
-            task = async_search_skill(skill, tasks, source_discoverer, semaphore, delay)
-            tasks_list.append(task)
-        
-        if tasks_list:
-            logging.info(f"\n⏳ Running {len(tasks_list)} searches with throttling...\n")
-            
-            for coro in asyncio.as_completed(tasks_list):
-                try:
-                    skill, result = await coro
-                    results[skill] = result
-                    SEARCH_CACHE[skill] = result
-                    logging.info(f"   ✓ Completed: {skill} - Found {len(result['urls'])} URLs")
-                except Exception as e:
-                    logging.error(f"   ✗ Error: {str(e)[:100]}", exc_info=True)
-        
-        if batch_end < len(unique_skills):
-            logging.info(f"\n⏳ Waiting {REQUEST_DELAY_SECONDS * len(batch)}s before next batch...\n")
-            await asyncio.sleep(REQUEST_DELAY_SECONDS * len(batch))
-    
-    return results
-
-
-def test_source_discoverer_agent(skills_from_agent1: list):
+async def test_source_discoverer_agent(skills_from_agent1: list):
     """
     Test the Source Discoverer Agent.
     Takes structured skill list from Agent 1 (JSON input).
     
-    Returns clean JSON with skills and their URLs.
-    
-    Optimizations applied:
-    1. Deduplicate skills (simple comparison)
-    2. Async batch processing (concurrent searches)
-    3. Cache reuse (avoid duplicate searches)
-    4. Semaphore control (rate limiting, max 3 concurrent)
+    Returns clean JSON with skills and their sources (URL + content).
     
     Args:
         skills_from_agent1: List of skills extracted from Agent 1
     
     Returns:
-        dict: Clean format with skills mapped to URLs
+        dict: Clean format with skills mapped to sources
     """
     
     if not skills_from_agent1 or len(skills_from_agent1) == 0:
         logging.error("Error: No skills provided from Agent 1")
         return None
     
-    logging.info(f"\n{'='*80}")
-    logging.info(f"🚀 SOURCE DISCOVERER AGENT")
-    logging.info(f"{'='*80}")
+    logging.info("=" * 80)
+    logging.info("SOURCE DISCOVERER AGENT")
+    logging.info("=" * 80)
     logging.info(f"Input skills: {len(skills_from_agent1)}")
-    
-    unique_skills, dedup_info = deduplicate_skills(skills_from_agent1)
     
     agents = InterviewPrepAgents()
     tasks = InterviewPrepTasks()
     
     tools = {
-        "google_search_tool": google_search_tool
+        "grounded_source_discoverer": grounded_source_discoverer
     }
     
     source_discoverer = agents.source_discoverer_agent(tools)
     
+    logging.info("=" * 80)
+    logging.info("SEARCHING FOR RESOURCES")
+    logging.info("=" * 80)
+    
     all_sources = {}
-    cached_count = 0
     
-    logging.info(f"\n{'='*80}")
-    logging.info(f"SEARCHING FOR RESOURCES")
-    logging.info(f"{'='*80}\n")
+    for skill in skills_from_agent1:
+        try:
+            logging.info(f"\nProcessing skill: {skill}")
+            
+            discover_task = tasks.discover_and_extract_content_task(source_discoverer, skill)
+            search_crew = CrewAI(# type: ignore
+                agents=[source_discoverer],
+                tasks=[discover_task],
+                process=Process.sequential,
+                verbose=True)
+            
+            # Use kickoff_async for async agents
+            search_result = await search_crew.kickoff_async()
+            
+            # Parse the result from the tool - CrewAI returns objects, not JSON strings
+            try:
+                # CrewAI returns result objects, so we need to access their raw attribute or convert to dict
+                if hasattr(search_result, 'raw'):
+                    # If it has a raw attribute, try to parse it as JSON
+                    try:
+                        result_dict = json.loads(search_result.raw)
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, try to extract from the raw string
+                        raw_str = str(search_result.raw)
+                        # Look for JSON-like content in the raw string
+                        import re
+                        json_match = re.search(r'\{.*\}', raw_str, re.DOTALL)
+                        if json_match:
+                            result_dict = json.loads(json_match.group())
+                        else:
+                            result_dict = {"all_sources": [{"skill": skill, "sources": [], "questions": [], "extracted_content": ""}]}
+                elif isinstance(search_result, dict):
+                    # If it's already a dict, use it directly
+                    result_dict = search_result
+                else:
+                    # Try to convert the result to a dict
+                    result_dict = {"all_sources": [{"skill": skill, "sources": [], "questions": [], "extracted_content": ""}]}
+                
+                # Handle the case where result_dict might have 'all_sources' key directly
+                if 'all_sources' in result_dict:
+                    try:
+                        parsed_result = AllSkillSources(**result_dict)
+                        source_entries = parsed_result.all_sources
+                    except Exception:
+                        # If schema validation fails, use the raw data
+                        source_entries = result_dict.get('all_sources', [])
+                else:
+                    # Fallback: treat result_dict as containing source entries directly
+                    source_entries = result_dict if isinstance(result_dict, list) else [result_dict]
+                
+                # Extract the first source entry (should contain the skill)
+                if source_entries:
+                    source_entry = source_entries[0]
+                    # Handle both dict and SkillSources object
+                    if isinstance(source_entry, dict):
+                        sources = source_entry.get('sources', [])
+                        questions = source_entry.get('questions', [])
+                        extracted_content = source_entry.get('extracted_content', '')
+                    else:
+                        # Handle SkillSources object
+                        sources = source_entry.sources if hasattr(source_entry, 'sources') else []
+                        questions = source_entry.questions if hasattr(source_entry, 'questions') else []
+                        extracted_content = source_entry.extracted_content if hasattr(source_entry, 'extracted_content') else ""
+                    
+                    # If questions are empty but we can see from logs that they exist, try fallback extraction
+                    if not questions and hasattr(search_result, 'raw'):
+                        try:
+                            if hasattr(search_result, 'raw'):
+                                raw_str = str(search_result.raw)
+                                # Look for questions array in the raw response
+                                import re
+                                questions_match = re.search(r'"questions":\s*\[(.*?)\]', raw_str, re.DOTALL)
+                                if questions_match:
+                                    questions_str = questions_match.group(1)
+                                    # Extract individual questions (handling escaped quotes)
+                                    questions = re.findall(r'"((?:[^"\\]|\\.)*)"', questions_str)
+                                    logging.info(f"   Fallback question extraction found {len(questions)} questions")
+                        except Exception:
+                            pass
+                    
+                    all_sources[skill] = {
+                        "sources": sources,
+                        "source": "grounded_search",
+                        "status": "success" if sources or questions else "no_sources",
+                        "sources_found_count": len(sources),
+                        "questions": questions,
+                        "extracted_content": extracted_content
+                    }
+                    logging.info(f"   Found {len(sources)} sources for {skill}")
+                    if questions:
+                        logging.info(f"   Found {len(questions)} questions for {skill}")
+                else:
+                    all_sources[skill] = {
+                        "sources": [],
+                        "source": "grounded_search",
+                        "status": "no_sources",
+                        "sources_found_count": 0,
+                        "questions": [],
+                        "extracted_content": ""
+                    }
+                    logging.info(f"   No sources found for {skill}")
+                    
+            except Exception as e:
+                logging.error(f"Error parsing result for {skill}: {e}")
+                logging.error(f"Raw response type: {type(search_result)}")
+                # Use fallback extraction
+                try:
+                    # Try to extract data from CrewAI result
+                    if hasattr(search_result, 'raw') and search_result.raw:
+                        raw_str = str(search_result.raw)
+                        # Look for questions array in the raw response
+                        import re
+                        questions_match = re.search(r'"questions":\s*\[(.*?)\]', raw_str, re.DOTALL)
+                        if questions_match:
+                            questions_str = questions_match.group(1)
+                            # Extract individual questions (handling escaped quotes)
+                            questions = re.findall(r'"((?:[^"\\]|\\.)*)"', questions_str)
+                            logging.info(f"   Fallback extraction successful for {skill}: {len(questions)} questions found")
+                        else:
+                            questions = []
+                    else:
+                        questions = []
+                    
+                    all_sources[skill] = {
+                        "sources": [],
+                        "source": "grounded_search",
+                        "status": "success" if questions else "no_sources",
+                        "sources_found_count": 0,
+                        "questions": questions,
+                        "extracted_content": ""
+                    }
+                except Exception as fallback_error:
+                    logging.error(f"Fallback extraction also failed for {skill}: {fallback_error}")
+                    all_sources[skill] = {
+                        "sources": [],
+                        "source": "error",
+                        "status": "failed",
+                        "sources_found_count": 0,
+                        "questions": [],
+                        "extracted_content": ""
+                    }
+                
+        except Exception as e:
+            logging.error(f"Error processing {skill}: {str(e)}", exc_info=True)
+            all_sources[skill] = {
+                "sources": [],
+                "source": "error",
+                "status": "failed",
+                "sources_found_count": 0,
+                "questions": [],
+                "extracted_content": ""
+            }
     
-    async_results = asyncio.run(
-        process_skills_async(unique_skills, tasks, source_discoverer, max_concurrent=1)
-    )
-    all_sources.update(async_results)
-    
-    llm_searches = len([r for r in all_sources.values() if r.get('source') == 'llm_search'])
-    cached_count = len([r for r in all_sources.values() if r.get('source') != 'llm_search'])
-    
-    logging.info(f"\n{'='*80}")
-    logging.info(f"📊 PROCESSING COMPLETE")
-    logging.info(f"{'='*80}")
+    logging.info("=" * 80)
+    logging.info("PROCESSING COMPLETE")
+    logging.info("=" * 80)
     logging.info(f"  Input skills: {len(skills_from_agent1)}")
-    logging.info(f"  Unique skills: {len(unique_skills)}")
-    logging.info(f"  Duplicates removed: {dedup_info['original_count'] - len(unique_skills)}")
-    logging.info(f"  ♻️  Cache hits: {cached_count}")
-    logging.info(f"  🔍 New LLM searches: {llm_searches}")
-    
-    clean_output = {}
-    for skill, data in all_sources.items():
-        clean_output[skill] = data.get("urls", [])
+    logging.info(f"  Skills processed: {len(all_sources)}")
+    logging.info(f"  Successful searches: {len([r for r in all_sources.values() if r.get('status') == 'success'])}")
+    logging.info(f"  Failed searches: {len([r for r in all_sources.values() if r.get('status') == 'failed'])}")
     
     output_data = {
-        "skills_with_resources": clean_output,
+        "skills_with_sources": all_sources,
         "input_skills": skills_from_agent1,
-        "unique_skills": unique_skills,
-        "duplicates_removed": dedup_info['original_count'] - len(unique_skills),
-        "optimization_stats": {
-            "cache_hits": cached_count,
-            "llm_searches": llm_searches,
-            "total_skills_processed": len(skills_from_agent1)
-        },
         "status": "success" if all_sources else "failed"
+    }
+    
+    # Save in proper schema format
+    schema_output = {
+        "all_sources": [
+            {
+                "skill": skill,
+                "sources": data["sources"],
+                "questions": data["questions"],
+                "extracted_content": data["extracted_content"]
+            }
+            for skill, data in all_sources.items()
+        ]
     }
     
     output_path = "app/tests/discovered_sources.json"
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(clean_output, f, indent=2, ensure_ascii=False)  # type: ignore
+        json.dump(schema_output, f, indent=2, ensure_ascii=False)
     
     logging.info(f"\n Results saved to: {output_path}")
-    logging.info(f"{'='*80}\n")
+    logging.info("=" * 80)
     
     return output_data
 
@@ -289,7 +253,7 @@ if __name__ == "__main__":
     
     if not os.path.exists(agent1_output_path):
         logging.error(f"Error: Agent 1 output not found at {agent1_output_path}")
-        logging.error("Please run test_agent_1_resume_analyzer.py first (using hybrid approach)")
+        logging.error("Please run test_agent_1_resume_analyzer.py first")
         sys.exit(1)
     
     with open(agent1_output_path, "r", encoding="utf-8") as f:
@@ -301,14 +265,12 @@ if __name__ == "__main__":
         logging.error("Error: No skills found in Agent 1 output")
         sys.exit(1)
     
-    result = test_source_discoverer_agent(skills)
+    # Run async function
+    result = asyncio.run(test_source_discoverer_agent(skills))
     
     if result:
-        logging.info("\nTest Results Summary (Hybrid Approach):")
+        logging.info("\nTest Results Summary:")
         logging.info(json.dumps({
             "input_skills": result["input_skills"],
-            "unique_skills": result["unique_skills"],
-            "duplicates_removed": result["duplicates_removed"],
-            "optimization_stats": result["optimization_stats"],
             "status": result["status"]
         }, indent=2))
