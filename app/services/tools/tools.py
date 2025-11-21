@@ -63,9 +63,9 @@ def file_text_extractor(file_path: str) -> str:
 @tool
 async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
     """
-    Asynchronously discovers authoritative web sources using Gemini's native search grounding.
-    This function acts as a RAG system, extracting real-world web content to provide
-    context for question generation by the third agent.
+    Asynchronously retrieves Gemini's native search response for a given skill.
+    This function returns the raw Gemini response text along with the skill,
+    providing context for question generation by the third agent.
     """
     return await discover_sources(search_query)
 

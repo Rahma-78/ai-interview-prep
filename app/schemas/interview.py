@@ -6,8 +6,7 @@ class ExtractedSkills(BaseModel):
 
 class SkillSources(BaseModel):
     skill: str = Field(description="The technical skill.")
-    sources: List[Dict[str, str]] = Field(description="A list of sources with URL, and content.")
-    extracted_content: str = Field(description="A summary of key themes and patterns found across sources.")
+    extracted_content: str = Field(description="The raw response text from Gemini containing technical content.")
 
 class AllSkillSources(BaseModel):
     all_sources: List[SkillSources] = Field(description="A list of all skills with their sources.")
