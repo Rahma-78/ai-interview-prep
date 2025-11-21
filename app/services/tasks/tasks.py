@@ -39,17 +39,18 @@ class InterviewPrepTasks:
         """
         Defines the task for discovering sources and extracting content for a given skill.
         This task uses the 'grounded_source_discoverer' tool to find technical
-        interview questions and their sources using Google Search grounding.
+        learning resources and provide them as context for the next agent.
         """
         return Task(
-            description=f"Find high-quality technical interview questions and learning resources for '{skill}'. "
-                        f"Use the 'grounded_source_discoverer' tool to search for authoritative sources like tutorials, educational websites, documentation, and interview question websites. "
-                        f"Focus on text-based content (articles, documentation, Q&A sites, blogs, guides). "
-                        "The tool will use Google Search grounding to find relevant information and return a JSON object containing the skill, a list of sources (with URL, title, and content), a list of discovered questions, and extracted content. "
+            description=f"Find high-quality technical learning resources for '{skill}'. "
+                        f"Use the 'grounded_source_discoverer' tool to search for authoritative sources like tutorials, educational websites, and technical documentation. "
+                        f"Focus on extracting substantial text-based content that can be used as context for generating interview questions. "
+                        "The tool will use Google Search grounding to find relevant information and return a JSON object containing the skill, a list of sources (with URL, title, and content), and a summary of the extracted content. "
+                        "The 'questions' field in the output should be an empty list, as question generation is handled by a different agent. "
                         "Return up to 5-10 results for better coverage. "
                         "CRITICAL: Make only ONE search attempt. If the search returns no results, return an empty list. Do NOT try multiple search queries or variations.",
             agent=agent,
-            expected_output="A JSON object conforming to the AllSkillSources schema, containing the skill, sources, questions, and extracted content.",
+            expected_output="A JSON object conforming to the AllSkillSources schema, containing the skill, sources, an empty 'questions' list, and the extracted content summary.",
             output_json=AllSkillSources,
             output_file="app/tests/discovered_sources.json"
         )

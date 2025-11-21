@@ -63,6 +63,9 @@ class InterviewPrepAgents:
             tools=[tools["grounded_source_discoverer"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
+            max_iter=3,
+            max_rpm=30,
+            cache=False,
             async_execution=True,  # Enable async execution for better performance
             response_format=AllSkillSources  # Enforce output format
         )

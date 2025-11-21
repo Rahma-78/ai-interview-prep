@@ -23,7 +23,7 @@ from app.schemas.interview import (
     SkillSources,
 )
 from app.services.tools.helpers import (
-    generate_fallback_results,
+    _create_fallback_sources,
     optimize_search_query,
 )
 from app.services.tools.llm_config import llm_openrouter, llm_gemini_flash
@@ -31,7 +31,6 @@ from app.services.tools.utils import async_rate_limiter
 from app.services.tools.parsers import (
     extract_grounding_sources,
     clean_and_parse_json,
-    format_discovery_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,15 +88,16 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
     """
     try:
         await async_rate_limiter.wait_if_needed()
-        logger.info(f"Discovering sources for '{search_query}' using Gemini native search")
+        
+        # Optimize the search query for better results
+        optimized_query = optimize_search_query(search_query)
+        logger.info(f"Discovering sources for '{optimized_query}' using Gemini native search")
 
         # Use Gemini's native search grounding to find authoritative sources
         search_prompt = f"""
-        Find high-quality technical learning resources and authoritative sources for '{search_query}'.
-        
+        Find high-quality technical learning resources and authoritative sources for '{optimized_query}'.
         Search for authoritative sources like tutorials, educational websites, documentation,
         technical articles, and expert blogs. Focus on text-based content with substantial information.
-        
         Return a JSON object with the following structure:
         {{
             "sources": [
@@ -108,7 +108,6 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
                 }}
             ]
         }}
-        
         Include 5-10 high-quality sources with substantial content excerpts.
         Use Google Search grounding to find relevant information.
         """
@@ -125,74 +124,47 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
         
         logger.info(f"Raw search response for '{search_query}': {str(search_response)[:500]}...")
 
-        # Extract sources from Gemini's response
-        sources = []
+        # --- Refactored Source Extraction Logic ---
         
+        # 1. Prioritize structured grounding metadata for URLs and titles
+        sources = extract_grounding_sources(search_response)
+        source_map = {s['url']: s for s in sources}
+
+        # 2. Try to parse JSON to get content and supplement sources
         try:
-            # First, try to parse the response as JSON directly
             response_data = clean_and_parse_json(search_response)
-            
             if 'sources' in response_data:
-                for source in response_data['sources'][:10]:  # Top 10 results
-                    sources.append({
-                        "url": source.get('url', ''),
-                        "title": source.get('title', ''),
-                        "content": source.get('content', '')[:2000]  # Limit content size
-                    })
-            
-            # If no sources found in JSON, try to extract from grounding metadata
-            if not sources:
-                grounding_sources = extract_grounding_sources(search_response)
-                sources.extend(grounding_sources)
-                
-                # If we have grounding sources but no content, try to extract content
-                if grounding_sources:
-                    content_extraction_prompt = f"""
-                    Extract detailed content from the following URLs about '{search_query}':
-                    {json.dumps([s['url'] for s in grounding_sources[:3]], indent=2)}
-                    
-                    For each URL, provide a substantial content excerpt (200-500 words)
-                    that would be useful for generating technical interview questions.
-                    
-                    Return a JSON object with the same structure as the sources above.
-                    """
-                    
-                    content_response = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            llm_gemini_flash.call,
-                            messages=[{"role": "user", "content": content_extraction_prompt}]
-                        ),
-                        timeout=30.0
-                    )
-                    
-                    content_data = clean_and_parse_json(content_response)
-                    if 'sources' in content_data:
-                        sources.extend(content_data['sources'][:7])  # Add more sources
+                for source in response_data['sources']:
+                    url = source.get('url')
+                    if url in source_map:
+                        # If source from grounding exists, update its content
+                        source_map[url]['content'] = source.get('content', '')[:2000]
+                    else:
+                        # Otherwise, add it as a new source
+                        new_source = {
+                            "url": url,
+                            "title": source.get('title', ''),
+                            "content": source.get('content', '')[:2000]
+                        }
+                        sources.append(new_source)
+                        source_map[url] = new_source
+        except (JSONDecodeError, TypeError):
+            logger.warning(f"Could not parse JSON from response for '{search_query}'. Relying solely on grounding.")
 
-        except JSONDecodeError:
-            # If JSON parsing fails, try to extract from grounding metadata
-            logger.warning(f"JSON parsing failed for '{search_query}', extracting from grounding metadata")
-            grounding_sources = extract_grounding_sources(search_response)
-            sources.extend(grounding_sources)
-
-        # Generate extracted_content summary for RAG context
+        # 3. Generate a summary of the extracted content for the RAG context
         extracted_content = ""
         if sources:
-            # Create a summary of the key themes and patterns across sources
             content_summary_prompt = f"""
             Based on the following sources about '{search_query}', provide a comprehensive summary
             of the key themes, concepts, and patterns that would be most relevant for generating
             technical interview questions.
-            
             Sources: {json.dumps(sources, indent=2)}
-            
             Return a detailed summary (300-500 words) focusing on:
             - Core technical concepts and terminology
             - Common problem patterns and approaches
             - Key learning objectives and takeaways
             - Industry best practices and standards
             """
-            
             try:
                 summary_response = await asyncio.wait_for(
                     asyncio.to_thread(
@@ -201,24 +173,51 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
                     ),
                     timeout=30.0
                 )
-                
-                extracted_content = clean_and_parse_json(summary_response).get("summary", "")
-                if not extracted_content:
-                    extracted_content = str(summary_response)[:2000]  # Fallback to raw content
-                    
+                extracted_content = str(summary_response)[:2000]
             except Exception as e:
                 logger.warning(f"Could not generate content summary: {e}")
-                # Combine source content as fallback
-                extracted_content = "\n\n".join([s.get('content', '') for s in sources[:5]])
-                extracted_content = extracted_content[:2000] if extracted_content else ""
+                # Fallback: combine content from the first few sources
+                extracted_content = "\n\n".join(s.get('content', '') for s in sources[:5] if s.get('content'))
+                extracted_content = extracted_content[:2000]
+
+        # 4. Validate that the extracted content is substantial enough
+        if len(extracted_content) < 100:
+            logger.warning(f"Extracted content for '{search_query}' is too short. Returning fallback.")
+            return _create_fallback_sources(search_query)
+        
+        # Additional validation: check if we have enough high-quality sources
+        high_quality_sources = [s for s in sources if len(s.get('content', '')) > 200]
+        if len(high_quality_sources) < 3:
+            logger.warning(f"Not enough high-quality sources for '{search_query}'. Found {len(high_quality_sources)} with substantial content.")
+            # Try to enhance content from existing sources
+            for source in sources[:5]:  # Try to enhance first 5 sources
+                if len(source.get('content', '')) < 200 and source.get('url'):
+                    try:
+                        # Try to get more content from the source URL
+                        content_enhancement_prompt = f"""
+                        Extract the most relevant technical content from this URL about '{search_query}' that would be useful for generating interview questions:
+                        URL: {source['url']}
+                        Title: {source['title']}
+                        Return only the most important technical concepts, problem-solving approaches, and key terminology (300-500 words).
+                        """
+                        enhanced_content = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                llm_gemini_flash.call,
+                                messages=[{"role": "user", "content": content_enhancement_prompt}]
+                            ),
+                            timeout=15.0
+                        )
+                        source['content'] = str(enhanced_content)[:2000]
+                    except Exception as e:
+                        logger.warning(f"Could not enhance content for {source['url']}: {e}")
 
         logger.info(f"Successfully discovered {len(sources)} sources for '{search_query}'")
         
-        # Create SkillSources object with proper structure
+        # Create SkillSources object with the final, structured data
         skill_sources = SkillSources(
             skill=search_query,
             sources=sources,
-            questions=[],  # Empty - questions will be generated by third agent
+            questions=[],  # Questions to be generated by the third agent
             extracted_content=extracted_content
         )
         
@@ -228,29 +227,13 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
         logger.error(f"Search call timed out for '{search_query}'")
         return _create_fallback_sources(search_query)
     except Exception as e:
-        logger.error(f"Search call failed for '{search_query}': {e}")
+        logger.error(f"Search call failed for '{search_query}': {e}", exc_info=True)
         if "quota" in str(e).lower() or "rate" in str(e).lower():
             logger.info(f"Rate limiting detected for '{search_query}', marking quota exhausted.")
             await async_rate_limiter.mark_quota_exhausted(retry_after_seconds=60)
         return _create_fallback_sources(search_query)
 
 
-def _create_fallback_sources(search_query: str) -> AllSkillSources:
-    """Create fallback sources when primary search fails."""
-    fallback_uris = [
-        f"https://en.wikipedia.org/wiki/{search_query.replace(' ', '_')}",
-        f"https://www.google.com/search?q={search_query.replace(' ', '+')}",
-    ]
-    
-    skill_sources = SkillSources(
-        skill=search_query,
-        sources=[{"url": uri, "title": f"Fallback source for {search_query}", "content": ""} 
-                for uri in fallback_uris],
-        questions=[],
-        extracted_content=f"Fallback sources for {search_query}. Consider manual search for better results."
-    )
-    
-    return AllSkillSources(all_sources=[skill_sources])
 
 
 @tool

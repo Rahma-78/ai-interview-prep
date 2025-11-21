@@ -7,13 +7,14 @@ logger = logging.getLogger(__name__)
 
 def extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
     """
-    Extracts grounding metadata with URI and title from Gemini's native search results.
+    Extracts grounding metadata with URI, title, confidence scores, and snippets
+    from Gemini's native search results for enhanced RAG context.
 
     Args:
         response_text: The LLM response text that may contain grounding metadata.
 
     Returns:
-        A list of dictionaries, each containing the 'url', 'title', and empty 'content'.
+        A list of dictionaries, each containing 'url', 'title', 'confidence', and 'snippet'.
     """
     grounding_sources = []
     try:
@@ -22,16 +23,35 @@ def extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
             grounding_match = re.search(grounding_pattern, response_text, re.DOTALL)
 
             if grounding_match:
-                web_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"'
-                web_matches = re.findall(web_pattern, grounding_match.group(0))
+                # Enhanced pattern to capture confidence scores and snippets
+                web_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"[^}]*"confidence":\s*([0-9.]+)[^}]*"snippet":\s*"([^"]*)"'
+                web_matches = re.findall(web_pattern, grounding_match.group(0), re.DOTALL)
 
-                for uri, title in web_matches:
+                for uri, title, confidence, snippet in web_matches:
                     if uri and title:
                         grounding_sources.append({
                             "url": uri,
                             "title": title,
-                            "content": ""
+                            "confidence": float(confidence) if confidence else 0.0,
+                            "snippet": snippet.replace('\n', ' ').strip(),
+                            "content": ""  # Keep for backward compatibility
                         })
+                
+                # Fallback for simpler grounding metadata
+                if not web_matches:
+                    simple_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"'
+                    simple_matches = re.findall(simple_pattern, grounding_match.group(0))
+                    
+                    for uri, title in simple_matches:
+                        if uri and title:
+                            grounding_sources.append({
+                                "url": uri,
+                                "title": title,
+                                "confidence": 0.0,
+                                "snippet": "",
+                                "content": ""
+                            })
+                            
     except Exception as e:
         logger.warning(f"Could not extract grounding metadata: {e}")
     return grounding_sources
@@ -58,18 +78,3 @@ def clean_and_parse_json(json_string: str) -> Dict[str, Any]:
     json_string = json_string.replace(',]', ']').replace(',}', '}')
 
     return json.loads(json_string)
-
-
-def format_discovery_result(skill: str, sources: List[Dict], questions: List[str], content: str) -> str:
-    """
-    Formats the discovered sources, questions, and content into the final JSON structure.
-    """
-    result_data = {
-        "all_sources": [{
-            "skill": skill,
-            "sources": sources,
-            "questions": questions,
-            "extracted_content": content[:2000] if content else ""
-        }]
-    }
-    return json.dumps(result_data)

@@ -1,6 +1,5 @@
 # 1. Removed all os and load_dotenv imports
 from crewai.llm import LLM
-# 2. Import the centralized settings object
 from app.core.config import settings
 
 """
@@ -12,9 +11,8 @@ This module provides:
 - Consistent temperature and API key handling
 """
 
-def get_llm(model: str , temperature: float = 0.1, api_key: str | None = None, **kwargs):
+def get_llm(model: str, api_key: str, temperature: float = 0.1, **kwargs):
     """Initializes and returns an LLM instance."""
-
     return LLM(model=model, temperature=temperature, api_key=api_key, **kwargs)
 
 

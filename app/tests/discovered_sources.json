@@ -4,117 +4,100 @@
       "skill": "Python",
       "sources": [
         {
-          "url": "https://realpython.com/python-interview-questions/",
-          "title": "Python Interview Questions: The Ultimate Guide",
-          "content": "A comprehensive guide covering core Python concepts, data structures, algorithms, OOP, web frameworks, and more, with detailed explanations and code examples. Highly recommended for in-depth preparation."
+          "url": "https://docs.python.org/3/",
+          "title": "The Python Standard Library - Python 3.x Documentation",
+          "content": "The Python Standard Library contains a vast collection of modules. Some modules are built into the interpreter; these provide access to operations that are not part of the core of the language but are nevertheless always available, either for efficiency or to provide access to operating system primitives such as system calls. The standard library is very extensive, offering a wide range of facilities. The modules contain built-in functions, classes, and variables that can be imported and used in Python code. For example, the `os` module provides a portable way of using operating system dependent functionality, while the `sys` module provides access to system-specific parameters and functions. Understanding and utilizing the standard library is crucial for efficient and robust Python programming, as it often provides ready-made solutions for common programming tasks, from file I/O and network communication to data serialization and mathematical operations."
         },
         {
-          "url": "https://www.geeksforgeeks.org/python-interview-questions/",
-          "title": "Top 50 Python Interview Questions & Answers",
-          "content": "A popular resource for common Python interview questions, ranging from basic to advanced topics, often including code examples and explanations. Covers a broad spectrum of essential Python knowledge."
+          "url": "https://docs.python-guide.org/",
+          "title": "The Hitchhiker's Guide to Python!",
+          "content": "This guide is a living, breathing collection of Python best practices, good examples, and authoritative advice on setting up your Python development environment, choosing the right tools, and writing idiomatic Python code. It aims to provide a comprehensive yet opinionated resource for experienced Python developers and newcomers alike, covering topics from installation and virtual environments to packaging, testing, and deployment. Unlike a traditional tutorial, it focuses on 'how to do things right' in the Python ecosystem, offering practical recommendations for common development challenges. For instance, it strongly advocates for the use of `pip` and `virtualenv` (or `venv`) for dependency management and project isolation, and provides guidance on choosing between various web frameworks, database libraries, and testing tools, helping developers navigate the rich but sometimes overwhelming landscape of Python libraries and tools."
         },
         {
-          "url": "https://pynative.com/python-interview-questions/",
-          "title": "Python Interview Questions and Answers",
-          "content": "Offers a wide array of Python interview questions, categorized by difficulty and topic, with clear answers and examples. Useful for quick review and understanding specific concepts."
+          "url": "https://realpython.com/",
+          "title": "Real Python: Learn Python Online",
+          "content": "Real Python offers high-quality, practical Python tutorials for all skill levels, from beginner to advanced. Our extensive library of articles, step-by-step guides, and video courses covers a wide range of topics, including core Python concepts, web development with Django and Flask, data science with Pandas and NumPy, automation, testing, and much more. Each tutorial is meticulously crafted by Python experts, focusing on clear explanations, real-world examples, and actionable code snippets to help you learn by doing. We emphasize best practices and idiomatic Python, ensuring that learners not only understand the 'how' but also the 'why' behind different programming patterns. Our learning paths are designed to guide you through complex subjects, making it easier to master new skills and apply them effectively in your projects."
         },
         {
-          "url": "https://docs.python.org/3/tutorial/",
-          "title": "The Python Tutorial (Official Documentation)",
-          "content": "The official introduction to Python from its creators. Essential for understanding the language's fundamentals, syntax, and standard library directly from the authoritative source."
-        },
-        {
-          "url": "https://www.educative.io/blog/python-interview-questions",
-          "title": "Python Interview Questions",
-          "content": "Provides a curated list of Python interview questions, often focusing on conceptual understanding and problem-solving, with explanations. Good for testing your grasp of core principles."
+          "url": "https://www.geeksforgeeks.org/python-tutorial/",
+          "title": "Python Tutorial - GeeksforGeeks",
+          "content": "GeeksforGeeks provides a comprehensive Python tutorial covering everything from basic syntax and data types to advanced topics like object-oriented programming, data structures, algorithms, and web development. It is an invaluable resource for students and professionals preparing for technical interviews, offering a vast collection of interview questions, coding challenges, and detailed explanations of fundamental computer science concepts implemented in Python. The platform emphasizes problem-solving skills, providing numerous examples and practice problems to solidify understanding. Whether you're learning Python for competitive programming, data science, or general software development, GeeksforGeeks offers structured learning paths and in-depth articles to help you master the language and its applications, often breaking down complex topics into easily digestible segments."
         },
         {
           "url": "https://www.programiz.com/python-programming/",
-          "title": "Python Tutorial",
-          "content": "Comprehensive tutorials on Python basics, data structures, functions, OOP, and more, with easy-to-understand explanations and examples. Excellent for foundational learning and reinforcing concepts."
-        },
-        {
-          "url": "https://medium.com/@dhavalpatel_999/100-python-interview-questions-and-answers-a2701166697d",
-          "title": "100+ Python Interview Questions and Answers",
-          "content": "A detailed article covering a wide range of Python topics, from fundamentals to advanced concepts, with clear explanations suitable for interview preparation. Found on Medium, often featuring quality technical content."
+          "title": "Python Tutorial - Learn Python Programming with Examples",
+          "content": "Programiz offers a beginner-friendly Python tutorial designed to make learning Python easy and enjoyable. Our tutorials start with the absolute basics, such as setting up your environment and understanding fundamental syntax, and gradually progress to more complex topics like functions, modules, and file I/O. Each concept is explained with clear, concise language and accompanied by numerous practical examples that you can run directly in your browser using our online interpreter. We focus on hands-on learning, encouraging users to experiment with code and see the results instantly. The site also includes quizzes and exercises to test your understanding, making it an excellent resource for self-paced learning and for those who prefer a straightforward, example-driven approach to mastering Python programming."
         },
         {
           "url": "https://www.w3schools.com/python/",
-          "title": "Python Tutorial",
-          "content": "A popular and beginner-friendly resource for learning Python basics, syntax, data types, functions, and more, with interactive examples. Good for quick lookups and initial learning."
+          "title": "Python Tutorial - W3Schools",
+          "content": "W3Schools provides a simple and easy-to-understand Python tutorial, perfect for beginners looking for quick references and practical examples. The tutorial covers core Python concepts, including variables, data types, operators, control flow (if/else, loops), functions, classes, and modules. Each page is structured to present a single concept with clear explanations and interactive 'Try it Yourself' examples, allowing users to modify code and see the output instantly. While it may not delve into the deepest theoretical aspects, W3Schools excels at providing a practical, hands-on introduction to Python programming, making it an excellent resource for quickly grasping syntax and basic functionality. It's often used as a quick lookup guide for common Python tasks and syntax reminders."
+        },
+        {
+          "url": "https://developers.google.com/edu/python/",
+          "title": "Google's Python Class - Google Developers",
+          "content": "Google's Python Class is a free, comprehensive course for people with a little programming experience who want to learn Python. The class includes written materials, lecture videos, and a substantial set of coding exercises with solutions. It covers fundamental Python concepts such as strings, lists, dictionaries, regular expressions, and file I/O, progressing to more advanced topics like processes and HTTP connections. The course emphasizes practical application and problem-solving, providing hands-on exercises that reinforce learning. While it includes video lectures, the accompanying text and exercises are substantial and self-contained, making it a valuable text-based resource for structured learning directly from Google's engineering team, offering insights into how Python is used in real-world applications."
+        },
+        {
+          "url": "https://www.tutorialspoint.com/python/index.htm",
+          "title": "Python Tutorial - Tutorialspoint",
+          "content": "TutorialsPoint offers an in-depth Python tutorial designed for both beginners and experienced programmers. It covers a vast array of topics, starting from the basics of Python installation and environment setup, moving through fundamental data types, operators, control structures, functions, and modules, and extending to advanced concepts like object-oriented programming, exception handling, multithreading, database access, and GUI programming. Each topic is presented with clear, detailed explanations and numerous code examples, making it a comprehensive reference. The tutorial is structured logically, allowing learners to follow a progressive path or jump to specific topics as needed. It serves as a robust text-based resource for understanding Python's syntax, features, and various application domains."
         }
       ],
-      "questions": [
-        "Explain the difference between `list` and `tuple` in Python. Provide scenarios where each would be preferred.",
-        "What is the Global Interpreter Lock (GIL) in Python? How does it affect multi-threaded programs, and what are common workarounds?",
-        "Describe decorators in Python. Provide a simple example of a decorator and explain its use case.",
-        "How do `__init__` and `self` work in Python classes? Explain their roles in object creation and method calls.",
-        "Differentiate between `is` and `==` operators in Python. When would you use each?",
-        "Explain the concepts of iterators and generators in Python. How do they improve memory efficiency?",
-        "Write a Python function to reverse a string without using slicing or built-in `reverse()` methods.",
-        "Implement a Python function to check if a given string is an anagram of another string.",
-        "Describe Python's memory management, including reference counting and garbage collection.",
-        "What are context managers in Python, and how do you implement them using `with` statements? Provide an example."
-      ],
-      "extracted_content": "The provided sources and questions highlight several key themes for Python technical interviews and learning. Core Python concepts are frequently tested, including understanding fundamental data structures like lists and tuples, the nuances of operators like `is` vs. `==`, and advanced features such as iterators, generators, decorators, and context managers. Object-Oriented Programming (OOP) principles, particularly the use of `__init__` and `self` in classes, are also crucial. A significant focus is placed on Python's internal mechanisms, such as the Global Interpreter Lock (GIL) and memory management (reference counting, garbage collection). Furthermore, problem-solving skills are assessed through algorithmic questions involving string manipulation, like reversing strings or checking for anagrams. The recommended learning resources range from official documentation (Python Tutorial) to popular educational platforms (Real Python, GeeksforGeeks, Programiz, W3Schools), indicating a need for both foundational knowledge and practical application."
+      "questions": [],
+      "extracted_content": "The provided Python technical learning resources collectively highlight a comprehensive set of themes crucial for generating effective technical interview questions, spanning core language constructs to industry best practices and real-world application.\n\n**Core Technical Concepts and Terminology:** Interview questions frequently revolve around fundamental Python elements. This includes basic syntax, built-in data types (strings, lists, dictionaries, tuples, sets), operators, and control flow mechanisms (if/else, loops like `for` and `while`). Object-Oriented Programming (OOP) concepts are consistently emphasized, requiring candidates to understand classes, objects, inheritance, polymorphism, and encapsulation. Beyond the basics, proficiency with functions (including arguments, return values, scope), modules, and packages (how to import and utilize them) is essential. A critical area is the **Python Standard Library**, with modules like `os` (operating system interaction), `sys` (system-specific parameters), `re` (regular expressions), and those for file I/O, network communication, data serialization, and mathematical operations being prime candidates for questions. Advanced topics such as exception handling, multithreading, database access, and GUI programming are also relevant for specialized roles.\n\n**Common Problem Patterns and Approaches:** Technical interviews often test problem-solving skills. Resources like GeeksforGeeks explicitly focus on coding challenges, algorithms, and data structures (e.g., sorting, searching, linked lists, trees) implemented in Python. Questions might involve optimizing code for efficiency, handling edge cases, or implementing common design patterns. Practical application is key; candidates should be able to apply Python to real-world scenarios, such as web development (Django, Flask), data science (Pandas, NumPy), automation, and scripting. Understanding how to debug code, write unit tests, and manage dependencies are also vital pro"
     },
     {
       "skill": "Machine Learning",
       "sources": [
         {
-          "url": "https://www.geeksforgeeks.org/top-50-machine-learning-interview-questions-answers/",
-          "title": "Top 50 Machine Learning Interview Questions & Answers",
-          "content": "A comprehensive list covering fundamental ML concepts, algorithms, and practical scenarios, often with concise explanations suitable for interview preparation."
+          "url": "https://www.tensorflow.org/learn",
+          "title": "TensorFlow Learn",
+          "content": "TensorFlow offers a comprehensive ecosystem of tools, libraries, and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML-powered applications. The 'Learn' section provides structured learning paths, including 'ML basics with Keras', 'Image classification', 'Text classification', and 'Generative AI'. It covers fundamental concepts, practical implementations, and advanced topics, guiding users from beginner to expert through tutorials, guides, and API documentation. This resource is essential for understanding how to build, train, and deploy machine learning models using one of the most widely adopted open-source platforms."
         },
         {
-          "url": "https://towardsdatascience.com/the-100-most-important-machine-learning-questions-53457583648",
-          "title": "The 100 Most Important Machine Learning Questions",
-          "content": "An extensive, categorized list of questions spanning various ML domains, from basics to advanced topics, with brief answers and references for deeper study."
+          "url": "https://pytorch.org/tutorials/",
+          "title": "PyTorch Tutorials",
+          "content": "The PyTorch Tutorials provide a rich collection of guides ranging from 'Learn the Basics' to advanced topics like 'Distributed Training' and 'TorchScript'. It offers practical, hands-on examples for building neural networks, performing data loading and preprocessing, and deploying models. Key sections include 'Deep Learning with PyTorch: A 60 Minute Blitz', 'ImageNet Training in PyTorch', and tutorials for specific domains like computer vision (e.g., 'Transfer Learning for Computer Vision Tutorial') and natural language processing. This resource is invaluable for developers and researchers looking to implement deep learning models with PyTorch's flexible and Python-centric framework."
         },
         {
-          "url": "https://www.interviewbit.com/machine-learning-interview-questions/",
-          "title": "Machine Learning Interview Questions",
-          "content": "Provides detailed answers and explanations for a wide array of ML interview questions, including theoretical concepts, algorithms, and practical applications, often with code snippets."
+          "url": "https://scikit-learn.org/stable/user_guide.html",
+          "title": "scikit-learn User Guide",
+          "content": "The scikit-learn User Guide is an exhaustive resource for traditional machine learning algorithms and techniques. It provides detailed explanations of various models, including classification (e.g., SVMs, Decision Trees, Random Forests), regression (e.g., Linear Regression, Ridge Regression), clustering (e.g., K-Means, DBSCAN), dimensionality reduction (e.g., PCA, t-SNE), and model selection. Each section includes theoretical background, practical usage examples with code snippets, and discussions on parameters and considerations. It's an authoritative reference for understanding the principles and application of classical machine learning algorithms in Python."
         },
         {
-          "url": "https://www.analyticsvidhya.com/blog/2021/08/50-most-important-machine-learning-interview-questions-answers/",
-          "title": "50 Most Important Machine Learning Interview Questions & Answers",
-          "content": "Offers a curated list of essential ML questions, covering algorithms, statistics, and practical scenarios, with clear and concise answers to aid understanding."
+          "url": "https://www.kaggle.com/learn",
+          "title": "Kaggle Learn",
+          "content": "Kaggle Learn offers a series of hands-on micro-courses designed to teach practical machine learning skills. These courses cover essential topics such as 'Python', 'Pandas', 'Intro to Machine Learning', 'Intermediate Machine Learning', 'Feature Engineering', 'Deep Learning', 'Computer Vision', and 'Natural Language Processing'. Each course consists of short lessons followed by interactive coding exercises, allowing learners to apply concepts immediately. It's an excellent resource for gaining practical experience, understanding common ML workflows, and preparing for real-world data science challenges and competitions."
         },
         {
-          "url": "https://www.educative.io/blog/machine-learning-interview-questions",
-          "title": "Machine Learning Interview Questions",
-          "content": "Focuses on common interview questions, providing insights into what interviewers look for and how to structure answers, often with conceptual explanations and tips."
+          "url": "http://cs229.stanford.edu/",
+          "title": "CS229: Machine Learning - Stanford University (Autumn 2018)",
+          "content": "Stanford's CS229 course, taught by Andrew Ng, provides a rigorous introduction to machine learning, covering a broad range of topics from supervised learning (linear regression, logistic regression, SVMs, neural networks) to unsupervised learning (K-means, PCA) and reinforcement learning. The publicly available lecture notes offer deep theoretical insights, mathematical derivations, and conceptual explanations of algorithms. This resource is highly authoritative for understanding the foundational principles, mathematical underpinnings, and advanced concepts of machine learning, making it ideal for those seeking a strong academic grounding."
         },
         {
-          "url": "https://leetcode.com/study-plan/machine-learning-interview-prep/",
-          "title": "Machine Learning Interview Prep",
-          "content": "A structured study plan that links to various topics, problems, and articles relevant for preparing for ML interviews, covering algorithms, data structures, and core ML concepts."
+          "url": "https://ai.googleblog.com/",
+          "title": "Google AI Blog",
+          "content": "The Google AI Blog serves as a primary source for updates on Google's cutting-edge research and developments in artificial intelligence and machine learning. It features articles written by researchers and engineers, detailing new models, algorithms, applications, and ethical considerations. Topics range from advancements in large language models (LLMs) and computer vision to responsible AI and quantum machine learning. This blog provides insights into the latest trends, breakthroughs, and practical applications of ML, offering a valuable perspective from one of the leading organizations in the field."
         },
         {
-          "url": "https://machinelearningmastery.com/machine-learning-interview-questions/",
-          "title": "Machine Learning Interview Questions",
-          "content": "Provides a list of common ML interview questions, often with links to more detailed explanations on their site, focusing on practical understanding and application."
+          "url": "https://www.deeplearning.ai/blog/",
+          "title": "DeepLearning.AI Blog",
+          "content": "The DeepLearning.AI Blog, associated with Andrew Ng's educational initiatives, offers accessible yet insightful articles on deep learning and AI. It covers a wide array of topics, including explanations of fundamental concepts, summaries of recent research papers, practical tips for building AI systems, and discussions on the future of AI. The blog aims to demystify complex topics, making them understandable for a broad audience while maintaining technical accuracy. It's an excellent resource for staying updated on deep learning advancements and reinforcing core knowledge."
         },
         {
-          "url": "https://towardsdatascience.com/machine-learning-system-design-interview-questions-a-comprehensive-guide-2024-edition-413123281023",
-          "title": "Machine Learning System Design Interview Questions: A Comprehensive Guide",
-          "content": "Specifically targets system design questions for ML roles, covering aspects like data pipelines, model deployment, scalability, and monitoring in production environments."
+          "url": "https://huggingface.co/docs/transformers/index",
+          "title": "Hugging Face Transformers Documentation",
+          "content": "The Hugging Face Transformers documentation is the definitive guide for working with state-of-the-art natural language processing (NLP) models. It provides comprehensive tutorials, conceptual guides, and API references for using pre-trained models like BERT, GPT, T5, and many others. Key sections include 'Quick tour', 'Loading a tokenizer and a model', 'Fine-tuning a pre-trained model', and guides on specific tasks like text classification, question answering, and summarization. This resource is indispensable for anyone looking to implement advanced NLP solutions, offering practical guidance and deep dives into the architecture and usage of transformer models."
+        },
+        {
+          "url": "https://learn.microsoft.com/en-us/training/paths/machine-learning-engineer/",
+          "title": "Microsoft Learn: Machine Learning Engineer Learning Path",
+          "content": "Microsoft Learn provides structured learning paths for various technical roles, including the Machine Learning Engineer path. This path comprises multiple modules covering topics such as 'Explore and build machine learning models', 'Train and evaluate deep learning models', 'Implement MLOps', and 'Deploy and consume models'. It focuses on practical skills using Azure Machine Learning, Python, and related tools. Each module includes conceptual explanations, hands-on labs, and knowledge checks, making it a robust resource for professionals seeking to develop or validate their ML engineering skills within a cloud environment."
         }
       ],
-      "questions": [
-        "Explain the difference between supervised, unsupervised, and reinforcement learning, and provide an example for each.",
-        "What is overfitting and underfitting in machine learning? How can you detect and mitigate them?",
-        "Describe the bias-variance trade-off. How does it relate to model complexity and generalization?",
-        "Explain the working principle of a Support Vector Machine (SVM). What are kernels, and why are they used in SVMs?",
-        "What is gradient descent, and how does it work? Discuss the differences between Batch, Stochastic, and Mini-batch Gradient Descent.",
-        "How do you handle imbalanced datasets in classification problems? Name at least three techniques.",
-        "Explain the concept of a confusion matrix, and define precision, recall, F1-score, and accuracy. When would you use each metric?",
-        "What are the key steps involved in deploying a machine learning model into production? Discuss challenges and considerations.",
-        "Describe the architecture of a Convolutional Neural Network (CNN). What are its main components (e.g., convolutional layers, pooling layers) and their functions?",
-        "How would you approach a machine learning problem from scratch, given a new dataset and a business objective? Outline your typical workflow."
-      ],
-      "extracted_content": ""
+      "questions": [],
+      "extracted_content": "The provided sources offer a comprehensive landscape of high-quality machine learning learning resources, collectively highlighting critical areas for technical proficiency and interview assessment.\n\n**Core Technical Concepts and Terminology:**\nInterview questions frequently revolve around foundational ML paradigms: **Supervised Learning** (e.g., classification, regression), **Unsupervised Learning** (e.g., clustering, dimensionality reduction), and increasingly, **Reinforcement Learning**. Candidates should be familiar with a range of algorithms, from traditional methods like **Linear/Logistic Regression, SVMs, Decision Trees, Random Forests, K-Means, PCA, and t-SNE** (covered extensively by scikit-learn and CS229) to advanced **Neural Networks** and **Deep Learning architectures** (CNNs, RNNs, Transformers like BERT, GPT, T5). Key terminology includes **Feature Engineering, Model Selection, Hyperparameter Tuning, Data Loading and Preprocessing, Evaluation Metrics, Transfer Learning, and Fine-tuning**. Proficiency in major frameworks like **TensorFlow (Keras), PyTorch, and scikit-learn** is paramount, along with specialized libraries like **Hugging Face Transformers** for NLP.\n\n**Common Problem Patterns and Approaches:**\nTechnical interviews often probe a candidate's ability to navigate the entire ML workflow. This includes understanding how to approach problems like **Image Classification, Text Classification, Generative AI, Question Answering, and Summarization**. Questions might cover **data loading and preprocessing** (e.g., using Pandas), **model training and evaluation**, and crucially, **model deployment and consumption**. A significant pattern is the use of **pre-trained models** and **fine-tuning** them for specific tasks, especially in deep learning and NLP. Concepts like **Distributed Training** and handling large datasets are also relevant for scalable solutions.\n\n**Key Learning Objectives and Takeaways:**\nSuccessful candidates demonstrate a blend of th"
     }
   ]
 }
