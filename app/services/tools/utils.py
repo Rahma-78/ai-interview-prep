@@ -6,6 +6,65 @@ from typing import List, Optional, Dict
 from app.core.config import settings
 
 
+async def retry_with_backoff(func, *args, max_retries=None, **kwargs):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        func: The function to retry
+        max_retries: Maximum number of retries (defaults to settings.MAX_RETRIES)
+        *args: Positional arguments to pass to func
+        **kwargs: Keyword arguments to pass to func
+        
+    Returns:
+        The result of func(*args, **kwargs)
+        
+    Raises:
+        The last exception if all retries fail
+    """
+    if max_retries is None:
+        max_retries = settings.MAX_RETRIES
+        
+    for attempt in range(max_retries + 1):  # +1 to include the initial attempt
+        try:
+            return await func(*args, **kwargs)
+        except asyncio.TimeoutError as e:
+            if attempt == max_retries:
+                raise
+            
+            # Calculate backoff time (exponential with jitter)
+            backoff = min(2 ** attempt, 10) + (0.1 * (attempt + 1))
+            await asyncio.sleep(backoff)
+        except Exception as e:
+            # For non-timeout errors, don't retry
+            raise
+
+async def call_llm_with_retry(llm_instance, prompt: str, timeout: int) -> str:
+    """
+    Calls an LLM with a given prompt, timeout, and retry logic.
+
+    Args:
+        llm_instance: The LLM instance to use for the call.
+        prompt: The prompt to send to the LLM.
+        timeout: The timeout for the LLM call.
+
+    Returns:
+        The LLM response as a string.
+    
+    Raises:
+        asyncio.TimeoutError: If the call times out after all retries.
+    """
+    async def make_llm_call():
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                llm_instance.call,
+                messages=[{"role": "user", "content": prompt}]
+            ),
+            timeout=timeout
+        )
+    
+    response = await retry_with_backoff(make_llm_call)
+    return str(response) if response is not None else ""
 class AsyncRateLimiter:
     """
     Manages API rate limiting and quota tracking for external services

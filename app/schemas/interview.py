@@ -6,8 +6,7 @@ class ExtractedSkills(BaseModel):
 
 class SkillSources(BaseModel):
     skill: str = Field(description="The technical skill.")
-    sources: List[Dict] = Field(description="A list of sources with URL and interview question content.")
-    questions: List[str] = Field(description="A list of actual interview questions found.", default=[])
+    sources: List[Dict[str, str]] = Field(description="A list of sources with URL, and content.")
     extracted_content: str = Field(description="A summary of key themes and patterns found across sources.")
 
 class AllSkillSources(BaseModel):
@@ -18,4 +17,4 @@ class InterviewQuestions(BaseModel):
     questions: List[str] = Field(description="A list of insightful interview questions for this skill.")
 
 class AllInterviewQuestions(BaseModel):
-    all_questions: List["InterviewQuestions"] = Field(description="A list of all skills with their generated questions.")
+    all_questions: List[InterviewQuestions] = Field(description="A list of all skills with their generated questions.")

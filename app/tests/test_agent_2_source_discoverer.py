@@ -93,13 +93,13 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                         if json_match:
                             result_dict = json.loads(json_match.group())
                         else:
-                            result_dict = {"all_sources": [{"skill": skill, "sources": [], "questions": [], "extracted_content": ""}]}
+                            result_dict = {"all_sources": [{"skill": skill, "sources": [], "extracted_content": ""}]}
                 elif isinstance(search_result, dict):
                     # If it's already a dict, use it directly
                     result_dict = search_result
                 else:
                     # Try to convert the result to a dict
-                    result_dict = {"all_sources": [{"skill": skill, "sources": [], "questions": [], "extracted_content": ""}]}
+                    result_dict = {"all_sources": [{"skill": skill, "sources": [], "extracted_content": ""}]}
                 
                 # Handle the case where result_dict might have 'all_sources' key directly
                 if 'all_sources' in result_dict:
@@ -119,32 +119,25 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                     # Handle both dict and SkillSources object
                     if isinstance(source_entry, dict):
                         sources = source_entry.get('sources', [])
-                        questions = source_entry.get('questions', [])
                         extracted_content = source_entry.get('extracted_content', '')
                     else:
                         # Handle SkillSources object
                         sources = source_entry.sources if hasattr(source_entry, 'sources') else []
-                        questions = source_entry.questions if hasattr(source_entry, 'questions') else []
                         extracted_content = source_entry.extracted_content if hasattr(source_entry, 'extracted_content') else ""
-                    
                     all_sources[skill] = {
                         "sources": sources,
                         "source": "grounded_search",
-                        "status": "success" if sources or questions else "no_sources",
+                        "status": "success" if sources else "no_sources",
                         "sources_found_count": len(sources),
-                        "questions": questions,
                         "extracted_content": extracted_content
                     }
                     logging.info(f"   Found {len(sources)} sources for {skill}")
-                    if questions:
-                        logging.info(f"   Found {len(questions)} questions for {skill}")
                 else:
                     all_sources[skill] = {
                         "sources": [],
                         "source": "grounded_search",
                         "status": "no_sources",
                         "sources_found_count": 0,
-                        "questions": [],
                         "extracted_content": ""
                     }
                     logging.info(f"   No sources found for {skill}")
@@ -172,9 +165,8 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                     all_sources[skill] = {
                         "sources": [],
                         "source": "grounded_search",
-                        "status": "success" if questions else "no_sources",
+                        "status": "no_sources",
                         "sources_found_count": 0,
-                        "questions": questions,
                         "extracted_content": ""
                     }
                 except Exception as fallback_error:
@@ -184,7 +176,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                         "source": "error",
                         "status": "failed",
                         "sources_found_count": 0,
-                        "questions": [],
                         "extracted_content": ""
                     }
                 
@@ -195,7 +186,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                 "source": "error",
                 "status": "failed",
                 "sources_found_count": 0,
-                "questions": [],
                 "extracted_content": ""
             }
     
@@ -219,7 +209,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             {
                 "skill": skill,
                 "sources": data["sources"],
-                "questions": data["questions"],
                 "extracted_content": data["extracted_content"]
             }
             for skill, data in all_sources.items()
@@ -234,7 +223,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             skill_sources = SkillSources(
                 skill=item["skill"],
                 sources=item["sources"],
-                questions=item["questions"],
                 extracted_content=item["extracted_content"]
             )
             skill_sources_list.append(skill_sources)
