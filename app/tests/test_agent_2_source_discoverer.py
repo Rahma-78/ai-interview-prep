@@ -1,5 +1,5 @@
 
-import asyncio
+
 import asyncio
 import json
 import logging
@@ -73,7 +73,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                 agents=[source_discoverer],
                 tasks=[discover_task],
                 process=Process.sequential,
-                verbose=True
+                verbose=False
             )
             # Use kickoff_async for async agents
             search_result = await search_crew.kickoff_async()

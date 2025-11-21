@@ -18,3 +18,5 @@ httpx
 
 PyPDF2
 
+
+google-generativeai

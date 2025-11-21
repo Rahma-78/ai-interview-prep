@@ -43,14 +43,12 @@ class InterviewPrepTasks:
         """
         return Task(
             description=f"Find high-quality technical learning resources for '{skill}'. "
-                        f"Use the 'grounded_source_discoverer' tool to search for authoritative sources "
+                        f"Use the 'grounded_source_discoverer' tool to search for authoritative sources. "
                         f"Focus on extracting substantial text-based content that can be used as context for generating interview questions. "
                         "The tool will use Google Search grounding to find relevant information and return a JSON object containing the skill, a list of sources (with URL, title, and content), and a summary of the extracted content. "
-                        "Return up to 5-10 results for better coverage. "
-                        "CRITICAL: Make only ONE search attempt. If the search returns no results, return an empty list. Do NOT try multiple search queries or variations.",
+                        "CRITICAL: Trust the tool's output completely. If it returns 2-3 sources, accept that. Do NOT try to invent sources or search again.",
             agent=agent,
-            expected_output="A JSON object conforming to the AllSkillSources schema, containing the skill, sources, an empty 'questions' list, and the extracted content summary.",
-            output_json=AllSkillSources,
+            expected_output="A JSON object conforming to the AllSkillSources schema, containing the skill, sources, and the extracted content summary.",
             output_file="app/tests/discovered_sources.json"
         )
 

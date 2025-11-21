@@ -2,7 +2,7 @@ from crewai import Agent
 from typing import Callable, Dict, List
 
 from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills
-from app.services.tools.llm_config import llm_gemini_flash, llm_groq, llm_openrouter
+from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter
 from app.core.config import settings # Import settings
 
 # ============================================================================
@@ -19,9 +19,10 @@ class InterviewPrepAgents:
         """
         Initializes the InterviewPrepAgents with instances of the language models.
         """
+        self.llm_gemini = llm_gemini
         self.llm_groq = llm_groq
         self.llm_openrouter = llm_openrouter
-        self.llm_gemini_flash = llm_gemini_flash
+
 
     def resume_analyzer_agent(self, tools: Dict[str, Callable]) -> Agent:
         """
@@ -55,10 +56,12 @@ class InterviewPrepAgents:
             role='Expert Research Analyst',
             goal='Find the best text-based web pages with technical resources for specific skills using Gemini\'s native search grounding. Prioritize famous question websites and  Q&A sites with written content.',
             backstory=(
-                "You are a world-class digital researcher with access to Gemini\'s native search capabilities. Your goal is to provide the best source material for generating interview questions. "
-                "The search results will include authoritative sources with proper grounding metadata."
+                "You are a world-class digital researcher with access to Gemini\'s native search capabilities. "
+                "Your goal is to provide the best source material for generating interview questions. "
+                "You MUST rely strictly on the output of the 'grounded_source_discoverer' tool. "
+                "Do not fabricate sources or hallucinate content. If the tool returns few results, work with what is provided."
             ),
-            llm=self.llm_gemini_flash,  # Use Gemini with native search grounding
+            llm=self.llm_gemini,  # Use Gemini for both agent orchestration and grounded search
             tools=[tools["grounded_source_discoverer"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
@@ -66,7 +69,7 @@ class InterviewPrepAgents:
             max_rpm=30,
             cache=False,
             async_execution=True,  # Enable async execution for better performance
-            response_format=AllSkillSources  # Enforce output format
+            
         )
 
     def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:
