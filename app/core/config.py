@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     SEARCH_TIMEOUT: int = 90
     SUMMARY_TIMEOUT: int = 45
     CONTENT_ENHANCEMENT_TIMEOUT: int = 30
+    QUESTION_GENERATION_TIMEOUT: int = 120
     MAX_RETRIES: int = 2
     
 

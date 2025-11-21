@@ -16,6 +16,7 @@ def extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
     Returns:
         A list of dictionaries, each containing 'url', 'title', 'confidence', and 'snippet'.
     """
+
     grounding_sources = []
     try:
         if 'groundingMetadata' in response_text:
@@ -23,16 +24,15 @@ def extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
             grounding_match = re.search(grounding_pattern, response_text, re.DOTALL)
 
             if grounding_match:
-                # Enhanced pattern to capture confidence scores and snippets
-                web_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"[^}]*"confidence":\s*([0-9.]+)[^}]*"snippet":\s*"([^"]*)"'
+                # Enhanced pattern to capture snippets
+                web_pattern = r'"uri":\s*"([^"]+)"[^}]*"title":\s*"([^"]+)"[^}]*"snippet":\s*"([^"]*)"'
                 web_matches = re.findall(web_pattern, grounding_match.group(0), re.DOTALL)
 
-                for uri, title, confidence, snippet in web_matches:
+                for uri, title, snippet in web_matches:
                     if uri and title:
                         grounding_sources.append({
                             "url": uri,
                             "title": title,
-                            "confidence": float(confidence) if confidence else 0.0,
                             "snippet": snippet.replace('\n', ' ').strip(),
                             "content": ""  # Keep for backward compatibility
                         })
@@ -47,15 +47,12 @@ def extract_grounding_sources(response_text: str) -> List[Dict[str, str]]:
                             grounding_sources.append({
                                 "url": uri,
                                 "title": title,
-                                "confidence": 0.0,
                                 "snippet": "",
                                 "content": ""
                             })
-                            
     except Exception as e:
         logger.warning(f"Could not extract grounding metadata: {e}")
     return grounding_sources
-
 
 def clean_and_parse_json(json_string: str) -> Dict[str, Any]:
     """

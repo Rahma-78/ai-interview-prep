@@ -15,7 +15,6 @@ def get_llm(model: str, api_key: str, temperature: float = 0.1, **kwargs):
     """Initializes and returns an LLM instance."""
     return LLM(model=model, temperature=temperature, api_key=api_key, **kwargs)
 
-
 # 4. Use the 'settings' object to get API keys.
 # No more manual checks are needed.
 
