@@ -1,8 +1,10 @@
 
 import asyncio
+import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -14,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import grounded_source_discoverer
-from app.schemas.interview import AllSkillSources
+from app.schemas.interview import AllSkillSources, SkillSources
+from app.core.config import settings
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -46,15 +49,18 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     agents = InterviewPrepAgents()
     tasks = InterviewPrepTasks()
     
+    # Tool configuration must match the agent's requirements
     tools = {
         "grounded_source_discoverer": grounded_source_discoverer
     }
     
+    # Create agent with proper tool registration
     source_discoverer = agents.source_discoverer_agent(tools)
     
     logging.info("=" * 80)
     logging.info("SEARCHING FOR RESOURCES")
     logging.info("=" * 80)
+
     
     all_sources = {}
     
@@ -63,12 +69,12 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             logging.info(f"\nProcessing skill: {skill}")
             
             discover_task = tasks.discover_and_extract_content_task(source_discoverer, skill)
-            search_crew = CrewAI(# type: ignore
+            search_crew = CrewAI(
                 agents=[source_discoverer],
                 tasks=[discover_task],
                 process=Process.sequential,
-                verbose=True)
-            
+                verbose=True
+            )
             # Use kickoff_async for async agents
             search_result = await search_crew.kickoff_async()
             
@@ -83,7 +89,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                         # If JSON parsing fails, try to extract from the raw string
                         raw_str = str(search_result.raw)
                         # Look for JSON-like content in the raw string
-                        import re
                         json_match = re.search(r'\{.*\}', raw_str, re.DOTALL)
                         if json_match:
                             result_dict = json.loads(json_match.group())
@@ -122,22 +127,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                         questions = source_entry.questions if hasattr(source_entry, 'questions') else []
                         extracted_content = source_entry.extracted_content if hasattr(source_entry, 'extracted_content') else ""
                     
-                    # If questions are empty but we can see from logs that they exist, try fallback extraction
-                    if not questions and hasattr(search_result, 'raw'):
-                        try:
-                            if hasattr(search_result, 'raw'):
-                                raw_str = str(search_result.raw)
-                                # Look for questions array in the raw response
-                                import re
-                                questions_match = re.search(r'"questions":\s*\[(.*?)\]', raw_str, re.DOTALL)
-                                if questions_match:
-                                    questions_str = questions_match.group(1)
-                                    # Extract individual questions (handling escaped quotes)
-                                    questions = re.findall(r'"((?:[^"\\]|\\.)*)"', questions_str)
-                                    logging.info(f"   Fallback question extraction found {len(questions)} questions")
-                        except Exception:
-                            pass
-                    
                     all_sources[skill] = {
                         "sources": sources,
                         "source": "grounded_search",
@@ -169,7 +158,6 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                     if hasattr(search_result, 'raw') and search_result.raw:
                         raw_str = str(search_result.raw)
                         # Look for questions array in the raw response
-                        import re
                         questions_match = re.search(r'"questions":\s*\[(.*?)\]', raw_str, re.DOTALL)
                         if questions_match:
                             questions_str = questions_match.group(1)
@@ -237,6 +225,26 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             for skill, data in all_sources.items()
         ]
     }
+    
+    # Validate against schema
+    try:
+        # Convert dict objects to proper SkillSources objects
+        skill_sources_list = []
+        for item in schema_output["all_sources"]:
+            skill_sources = SkillSources(
+                skill=item["skill"],
+                sources=item["sources"],
+                questions=item["questions"],
+                extracted_content=item["extracted_content"]
+            )
+            skill_sources_list.append(skill_sources)
+        
+        validated_output = AllSkillSources(all_sources=skill_sources_list)
+        logging.info("Schema validation successful")
+    except Exception as e:
+        logging.error(f"Schema validation failed: {e}")
+        # Fallback to basic format
+        validated_output = schema_output
     
     output_path = "app/tests/discovered_sources.json"
     with open(output_path, "w", encoding="utf-8") as f:

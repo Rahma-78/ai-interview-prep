@@ -53,10 +53,9 @@ class InterviewPrepAgents:
         """
         return Agent(  # type: ignore
             role='Expert Research Analyst',
-            goal='Find the best text-based web pages with technical resources for specific skills using Gemini\'s native search grounding. Prioritize articles, tutorials, documentation, and Q&A sites with written content.',
+            goal='Find the best text-based web pages with technical resources for specific skills using Gemini\'s native search grounding. Prioritize famous question websites and  Q&A sites with written content.',
             backstory=(
                 "You are a world-class digital researcher with access to Gemini\'s native search capabilities. Your goal is to provide the best source material for generating interview questions. "
-                "You will use Gemini\'s search grounding to find famous question websites, high-quality tutorials, and expert articles for each skill. "
                 "The search results will include authoritative sources with proper grounding metadata."
             ),
             llm=self.llm_gemini_flash,  # Use Gemini with native search grounding

@@ -22,6 +22,7 @@ from app.schemas.interview import (
     AllSkillSources,
     SkillSources,
 )
+from pydantic import BaseModel
 from app.services.tools.helpers import (
     _create_fallback_sources,
     optimize_search_query,
@@ -32,8 +33,47 @@ from app.services.tools.parsers import (
     extract_grounding_sources,
     clean_and_parse_json,
 )
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+# --- Helper Functions ---
+
+async def retry_with_backoff(func, *args, max_retries=None, **kwargs):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        func: The function to retry
+        max_retries: Maximum number of retries (defaults to settings.MAX_RETRIES)
+        *args: Positional arguments to pass to func
+        **kwargs: Keyword arguments to pass to func
+        
+    Returns:
+        The result of func(*args, **kwargs)
+        
+    Raises:
+        The last exception if all retries fail
+    """
+    if max_retries is None:
+        max_retries = settings.MAX_RETRIES
+        
+    for attempt in range(max_retries + 1):  # +1 to include the initial attempt
+        try:
+            return await func(*args, **kwargs)
+        except asyncio.TimeoutError as e:
+            if attempt == max_retries:
+                logger.error(f"Operation failed after {max_retries + 1} attempts: {e}")
+                raise
+            
+            # Calculate backoff time (exponential with jitter)
+            backoff = min(2 ** attempt, 10) + (0.1 * (attempt + 1))
+            logger.warning(f"Timeout on attempt {attempt + 1}, retrying in {backoff:.1f}s...")
+            await asyncio.sleep(backoff)
+        except Exception as e:
+            # For non-timeout errors, don't retry
+            raise
 
 
 # --- CrewAI Tools ---
@@ -98,6 +138,10 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
         Find high-quality technical learning resources and authoritative sources for '{optimized_query}'.
         Search for authoritative sources like tutorials, educational websites, documentation,
         technical articles, and expert blogs. Focus on text-based content with substantial information.
+        
+        CRITICAL: You MUST provide a COMPLETE and VALID JSON response. Do not truncate, cut off, or end mid-sentence.
+        Ensure your JSON response is properly formatted and contains all required fields.
+        
         Return a JSON object with the following structure:
         {{
             "sources": [
@@ -108,32 +152,43 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
                 }}
             ]
         }}
-        Include 5-10 high-quality sources with substantial content excerpts.
+        
+        Include 5-10 high-quality sources with substantial content excerpts (200-500 words per source).
         Use Google Search grounding to find relevant information.
+        
+        IMPORTANT: Your entire response must be valid JSON. Do not add any explanatory text before or after the JSON.
+        Ensure the JSON is complete and properly formatted with no missing brackets or braces.
         """
         
-        # Call Gemini with search tool enabled
-        search_response = await asyncio.wait_for(
-            asyncio.to_thread(
-                llm_gemini_flash.call,
-                messages=[{"role": "user", "content": search_prompt}]
-            ),
-            timeout=30.0
-        )
+        # Call Gemini with search tool enabled using retry logic
+        async def make_search_call():
+            return await asyncio.wait_for(
+                asyncio.to_thread(
+                    llm_gemini_flash.call,
+                    messages=[{"role": "user", "content": search_prompt}]
+                ),
+                timeout=settings.SEARCH_TIMEOUT
+            )
+            
+        search_response = await retry_with_backoff(make_search_call)
         await async_rate_limiter.record_request()
         
         logger.info(f"Raw search response for '{search_query}': {str(search_response)[:500]}...")
 
         # --- Refactored Source Extraction Logic ---
         
+        # Ensure search_response is a string
+        if search_response is None:
+            search_response = ""
+            
         # 1. Prioritize structured grounding metadata for URLs and titles
-        sources = extract_grounding_sources(search_response)
+        sources = extract_grounding_sources(str(search_response))
         source_map = {s['url']: s for s in sources}
 
         # 2. Try to parse JSON to get content and supplement sources
         try:
-            response_data = clean_and_parse_json(search_response)
-            if 'sources' in response_data:
+            response_data = clean_and_parse_json(str(search_response))
+            if 'sources' in response_data and response_data['sources']:
                 for source in response_data['sources']:
                     url = source.get('url')
                     if url in source_map:
@@ -148,8 +203,8 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
                         }
                         sources.append(new_source)
                         source_map[url] = new_source
-        except (JSONDecodeError, TypeError):
-            logger.warning(f"Could not parse JSON from response for '{search_query}'. Relying solely on grounding.")
+        except (JSONDecodeError, TypeError, Exception) as e:
+            logger.warning(f"Could not parse JSON from response for '{search_query}': {e}. Relying solely on grounding.")
 
         # 3. Generate a summary of the extracted content for the RAG context
         extracted_content = ""
@@ -166,13 +221,16 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
             - Industry best practices and standards
             """
             try:
-                summary_response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        llm_gemini_flash.call,
-                        messages=[{"role": "user", "content": content_summary_prompt}]
-                    ),
-                    timeout=30.0
-                )
+                async def make_summary_call():
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(
+                            llm_gemini_flash.call,
+                            messages=[{"role": "user", "content": content_summary_prompt}]
+                        ),
+                        timeout=settings.SUMMARY_TIMEOUT
+                    )
+                    
+                summary_response = await retry_with_backoff(make_summary_call)
                 extracted_content = str(summary_response)[:2000]
             except Exception as e:
                 logger.warning(f"Could not generate content summary: {e}")
@@ -200,13 +258,16 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
                         Title: {source['title']}
                         Return only the most important technical concepts, problem-solving approaches, and key terminology (300-500 words).
                         """
-                        enhanced_content = await asyncio.wait_for(
-                            asyncio.to_thread(
-                                llm_gemini_flash.call,
-                                messages=[{"role": "user", "content": content_enhancement_prompt}]
-                            ),
-                            timeout=15.0
-                        )
+                        async def make_enhancement_call():
+                            return await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    llm_gemini_flash.call,
+                                    messages=[{"role": "user", "content": content_enhancement_prompt}]
+                                ),
+                                timeout=settings.CONTENT_ENHANCEMENT_TIMEOUT
+                            )
+                            
+                        enhanced_content = await retry_with_backoff(make_enhancement_call)
                         source['content'] = str(enhanced_content)[:2000]
                     except Exception as e:
                         logger.warning(f"Could not enhance content for {source['url']}: {e}")
@@ -224,7 +285,8 @@ async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
         return AllSkillSources(all_sources=[skill_sources])
 
     except asyncio.TimeoutError:
-        logger.error(f"Search call timed out for '{search_query}'")
+        logger.error(f"Search call timed out for '{search_query}' after {settings.SEARCH_TIMEOUT}s and {settings.MAX_RETRIES} retries")
+        logger.info(f"Falling back to default sources for '{search_query}'")
         return _create_fallback_sources(search_query)
     except Exception as e:
         logger.error(f"Search call failed for '{search_query}': {e}", exc_info=True)

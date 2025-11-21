@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     CREWAI_TELEMETRY_OPT_OUT: bool = True
     REQUESTS_PER_MINUTE: int = 10
     
+    # Timeout configurations (in seconds)
+    SEARCH_TIMEOUT: int = 90
+    SUMMARY_TIMEOUT: int = 45
+    CONTENT_ENHANCEMENT_TIMEOUT: int = 30
+    MAX_RETRIES: int = 2
+    
 
 # Initialize settings and validate API keys
 settings = Settings()
