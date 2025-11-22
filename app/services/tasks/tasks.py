@@ -42,7 +42,7 @@ class InterviewPrepTasks:
         learning resources and provide them as context for the next agent.
         """
         return Task(
-            description=f"Find high-quality technical learning resources for '{skill}'. "
+            description=f"Find high-quality technical resources for '{skill}'. "
                         f"Use the 'grounded_source_discoverer' tool to search for authoritative sources. "
                         f"Focus on extracting substantial text-based content that can be used as context for generating interview questions. "
                         "The tool will use Google Search grounding to find relevant information and return a JSON object containing the skill, a list of sources (with URL, title, and content), and a summary of the extracted content. "

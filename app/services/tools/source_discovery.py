@@ -55,7 +55,7 @@ async def discover_sources(search_query: str) -> AllSkillSources:
         client = get_genai_client()
         
         search_prompt = f"""
-        Find technical resources of high quality technical content that would be useful for generating interview questions about '{optimized_query}' .
+        Find resources of high quality technical content about '{optimized_query}' that would be useful for generating interview questions .
 
         IMPORTANT: Return ONLY 2-3 sources maximum. Focus on quality over quantity.
         
@@ -66,7 +66,7 @@ async def discover_sources(search_query: str) -> AllSkillSources:
         - Best practices and important considerations
         - Typical challenges and solutions
         
-        Provide a comprehensive summary (300-500 words) suitable for generating interview questions.
+        Provide a comprehensive summary suitable for generating interview questions.
         """
 
         # Configure Google Search grounding tool
