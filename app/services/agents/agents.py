@@ -59,6 +59,7 @@ class InterviewPrepAgents:
                 "You are a world-class digital researcher with access to Gemini\'s native search capabilities. "
                 "Your goal is to provide the best source material for generating interview questions. "
                 "You MUST rely strictly on the output of the 'grounded_source_discoverer' tool. "
+                "The tool returns 'raw_content' text. You MUST parse this text and structure it into the 'extracted_content' schema fields (core_concepts, problem_solving, etc.). "
                 "Do not fabricate sources or hallucinate content. If the tool returns few results, work with what is provided."
             ),
             llm=self.llm_gemini,  # Use Gemini for both agent orchestration and grounded search
@@ -69,7 +70,7 @@ class InterviewPrepAgents:
             max_rpm=30,
             cache=False,
             async_execution=True,  # Enable async execution for better performance
-            
+            response_format=AllSkillSources  # Enforce output format
         )
 
     def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:

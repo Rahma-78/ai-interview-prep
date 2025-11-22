@@ -6,7 +6,7 @@ technical learning resources using Gemini's Google Search grounding.
 """
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Dict
 
 from google.genai import types
 
@@ -20,21 +20,19 @@ logger = logging.getLogger(__name__)
 def create_fallback_sources(
     search_query: str,
     error_message: Optional[str] = None
-) -> AllSkillSources:
+) -> Dict:
     """Create fallback content when primary search fails."""
     content_msg = f"Fallback response for {search_query}. Consider manual search for better results."
     if error_message:
         content_msg += f"\n\nDEBUG INFO: Search failed with error: {error_message}"
     
-    skill_sources = SkillSources(
-        skill=search_query,
-        extracted_content=content_msg
-    )
-    
-    return AllSkillSources(all_sources=[skill_sources])
+    return {
+        "skill": search_query,
+        "raw_content": content_msg
+    }
 
 
-async def discover_sources(search_query: str) -> AllSkillSources:
+async def discover_sources(search_query: str) -> Dict:
     """
     Discover authoritative web sources using Gemini's native search grounding.
     
@@ -55,18 +53,20 @@ async def discover_sources(search_query: str) -> AllSkillSources:
         client = get_genai_client()
         
         search_prompt = f"""
-        Find resources of high quality technical content about '{optimized_query}' that would be useful for generating interview questions .
+        Find resources of high quality technical content about '{optimized_query}' that would be useful for generating interview questions.
 
         IMPORTANT: Return ONLY 2-3 sources maximum. Focus on quality over quantity.
         
-        Extract the most relevant technical content covering:
+        Extract the most relevant technical content suitable for generating interview questions covering:
         - Core technical concepts and fundamentals
         - Common problem-solving approaches and patterns
         - Key terminology and definitions
         - Best practices and important considerations
         - Typical challenges and solutions
         
-        Provide a comprehensive summary suitable for generating interview questions.
+        CRITICAL FORMATTING INSTRUCTION:
+        - Do NOT list the selected resources or URLs in the response body.
+        - Ensure the content is dense, informative, and suitable for an expert interviewer context.
         """
 
         # Configure Google Search grounding tool
@@ -100,12 +100,10 @@ async def discover_sources(search_query: str) -> AllSkillSources:
         logger.info(f"Successfully retrieved response text for '{search_query}'")
         
         # Return only skill and raw response text
-        return AllSkillSources(all_sources=[
-            SkillSources(
-                skill=search_query,
-                extracted_content=response_text  # Raw Gemini response text
-            )
-        ])
+        return {
+            "skill": search_query,
+            "raw_content": response_text
+        }
 
     except asyncio.TimeoutError:
         logger.error(f"Search timed out for '{search_query}'")

@@ -80,35 +80,17 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             
             # Parse the result from the tool - CrewAI returns objects, not JSON strings
             try:
-                # CrewAI returns result objects, so we need to access their raw attribute or convert to dict
+                # CrewAI returns result objects, so we need to access their raw attribute
                 if hasattr(search_result, 'raw'):
-                    # If it has a raw attribute, try to parse it as JSON
-                    try:
-                        result_dict = json.loads(search_result.raw)
-                    except json.JSONDecodeError:
-                        # If JSON parsing fails, try to extract from the raw string
-                        raw_str = str(search_result.raw)
-                        # Look for JSON-like content in the raw string
-                        json_match = re.search(r'\{.*\}', raw_str, re.DOTALL)
-                        if json_match:
-                            result_dict = json.loads(json_match.group())
-                        else:
-                            result_dict = {"all_sources": [{"skill": skill, "sources": [], "extracted_content": ""}]}
+                    result_dict = json.loads(search_result.raw)
                 elif isinstance(search_result, dict):
-                    # If it's already a dict, use it directly
                     result_dict = search_result
                 else:
-                    # Try to convert the result to a dict
-                    result_dict = {"all_sources": [{"skill": skill, "sources": [], "extracted_content": ""}]}
+                    raise ValueError(f"Unexpected result type: {type(search_result)}")
                 
                 # Handle the case where result_dict might have 'all_sources' key directly
                 if 'all_sources' in result_dict:
-                    try:
-                        parsed_result = AllSkillSources(**result_dict)
-                        source_entries = parsed_result.all_sources
-                    except Exception:
-                        # If schema validation fails, use the raw data
-                        source_entries = result_dict.get('all_sources', [])
+                    source_entries = result_dict['all_sources']
                 else:
                     # Fallback: treat result_dict as containing source entries directly
                     source_entries = result_dict if isinstance(result_dict, list) else [result_dict]
@@ -118,75 +100,36 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
                     source_entry = source_entries[0]
                     # Handle both dict and SkillSources object
                     if isinstance(source_entry, dict):
-                        sources = source_entry.get('sources', [])
-                        extracted_content = source_entry.get('extracted_content', '')
+                        extracted_content = source_entry.get('extracted_content', {})
                     else:
                         # Handle SkillSources object
-                        sources = source_entry.sources if hasattr(source_entry, 'sources') else []
-                        extracted_content = source_entry.extracted_content if hasattr(source_entry, 'extracted_content') else ""
+                        extracted_content = source_entry.extracted_content.model_dump() if hasattr(source_entry, 'extracted_content') else {}
+                    
                     all_sources[skill] = {
-                        "sources": sources,
-                        "source": "grounded_search",
-                        "status": "success" if sources else "no_sources",
-                        "sources_found_count": len(sources),
-                        "extracted_content": extracted_content
+                        "extracted_content": extracted_content,
+                        "status": "success"
                     }
-                    logging.info(f"   Found {len(sources)} sources for {skill}")
+                    logging.info(f"   Content extracted for {skill}")
                 else:
                     all_sources[skill] = {
-                        "sources": [],
-                        "source": "grounded_search",
-                        "status": "no_sources",
-                        "sources_found_count": 0,
-                        "extracted_content": ""
+                        "extracted_content": {},
+                        "status": "no_content"
                     }
-                    logging.info(f"   No sources found for {skill}")
+                    logging.info(f"   No content found for {skill}")
                     
             except Exception as e:
                 logging.error(f"Error parsing result for {skill}: {e}")
                 logging.error(f"Raw response type: {type(search_result)}")
-                # Use fallback extraction
-                try:
-                    # Try to extract data from CrewAI result
-                    if hasattr(search_result, 'raw') and search_result.raw:
-                        raw_str = str(search_result.raw)
-                        # Look for questions array in the raw response
-                        questions_match = re.search(r'"questions":\s*\[(.*?)\]', raw_str, re.DOTALL)
-                        if questions_match:
-                            questions_str = questions_match.group(1)
-                            # Extract individual questions (handling escaped quotes)
-                            questions = re.findall(r'"((?:[^"\\]|\\.)*)"', questions_str)
-                            logging.info(f"   Fallback extraction successful for {skill}: {len(questions)} questions found")
-                        else:
-                            questions = []
-                    else:
-                        questions = []
-                    
-                    all_sources[skill] = {
-                        "sources": [],
-                        "source": "grounded_search",
-                        "status": "no_sources",
-                        "sources_found_count": 0,
-                        "extracted_content": ""
-                    }
-                except Exception as fallback_error:
-                    logging.error(f"Fallback extraction also failed for {skill}: {fallback_error}")
-                    all_sources[skill] = {
-                        "sources": [],
-                        "source": "error",
-                        "status": "failed",
-                        "sources_found_count": 0,
-                        "extracted_content": ""
-                    }
+                all_sources[skill] = {
+                    "extracted_content": {},
+                    "status": "failed"
+                }
                 
         except Exception as e:
             logging.error(f"Error processing {skill}: {str(e)}", exc_info=True)
             all_sources[skill] = {
-                "sources": [],
-                "source": "error",
-                "status": "failed",
-                "sources_found_count": 0,
-                "extracted_content": ""
+                "extracted_content": {},
+                "status": "failed"
             }
     
     logging.info("=" * 80)
@@ -197,42 +140,16 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     logging.info(f"  Successful searches: {len([r for r in all_sources.values() if r.get('status') == 'success'])}")
     logging.info(f"  Failed searches: {len([r for r in all_sources.values() if r.get('status') == 'failed'])}")
     
-    output_data = {
-        "skills_with_sources": all_sources,
-        "input_skills": skills_from_agent1,
-        "status": "success" if all_sources else "failed"
-    }
-    
     # Save in proper schema format
     schema_output = {
         "all_sources": [
             {
                 "skill": skill,
-                "sources": data["sources"],
                 "extracted_content": data["extracted_content"]
             }
             for skill, data in all_sources.items()
         ]
     }
-    
-    # Validate against schema
-    try:
-        # Convert dict objects to proper SkillSources objects
-        skill_sources_list = []
-        for item in schema_output["all_sources"]:
-            skill_sources = SkillSources(
-                skill=item["skill"],
-                sources=item["sources"],
-                extracted_content=item["extracted_content"]
-            )
-            skill_sources_list.append(skill_sources)
-        
-        validated_output = AllSkillSources(all_sources=skill_sources_list)
-        logging.info("Schema validation successful")
-    except Exception as e:
-        logging.error(f"Schema validation failed: {e}")
-        # Fallback to basic format
-        validated_output = schema_output
     
     output_path = "app/tests/discovered_sources.json"
     with open(output_path, "w", encoding="utf-8") as f:
@@ -241,7 +158,10 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     logging.info(f"\n Results saved to: {output_path}")
     logging.info("=" * 80)
     
-    return output_data
+    return {
+        "input_skills": skills_from_agent1,
+        "status": "success" if all_sources else "failed"
+    }
 
 
 if __name__ == "__main__":
