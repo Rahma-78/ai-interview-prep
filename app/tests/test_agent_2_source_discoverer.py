@@ -1,10 +1,8 @@
 
-
 import asyncio
 import json
 import logging
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -16,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import grounded_source_discoverer
-from app.schemas.interview import AllSkillSources, SkillSources
+from app.schemas.interview import AllSkillSources
 from app.core.config import settings
 
 # Configure logging for tests
@@ -58,110 +56,92 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     source_discoverer = agents.source_discoverer_agent(tools)
     
     logging.info("=" * 80)
-    logging.info("SEARCHING FOR RESOURCES")
+    logging.info("SEARCHING FOR RESOURCES (BATCHED)")
     logging.info("=" * 80)
 
+    # Create a single task for all skills (Batching Strategy)
+    # Note: We do not pass 'skills' explicitly here if the task definition relies on context,
+    # but since we are running this in isolation without the previous task's output in context,
+    # we might need to manually inject the context or modify the task to accept input.
+    # However, the task definition in tasks.py was updated to be generic.
+    # In a real Crew run, the output of the previous task is passed.
+    # Here, we can simulate the previous task's output or just pass the skills if the tool allows.
     
-    all_sources = {}
+    # Wait, the task definition in tasks.py is:
+    # def discover_and_extract_content_task(self, agent: Agent) -> Task:
+    #    description="... skills extracted in the previous task ..."
     
-    for skill in skills_from_agent1:
-        try:
-            logging.info(f"\nProcessing skill: {skill}")
+    # Since we are testing in isolation, we need to ensure the agent gets the skills.
+    # CrewAI agents can receive input via the `inputs` argument in `kickoff`.
+    
+    # Create a single task for all skills (Batching Strategy)
+    # We pass the skills explicitly to the task description for the test environment
+    discover_task = tasks.discover_and_extract_content_task(source_discoverer, skills=skills_from_agent1)
+    
+    search_crew = CrewAI(
+        agents=[source_discoverer],
+        tasks=[discover_task],
+        process=Process.sequential,
+        verbose=True
+    )
+    
+    # Pass the skills as input to the crew, simulating the output of the previous task
+    # The agent/tool needs to know the skills.
+    # The tool `grounded_source_discoverer` takes `skills: List[str]`.
+    # CrewAI will try to map the input to the tool arguments.
+    
+    inputs = {"skills": skills_from_agent1}
+    
+    try:
+        # Use kickoff_async for async agents
+        search_result = await search_crew.kickoff_async(inputs=inputs)
+        
+        logging.info("Search completed.")
+        
+        # Parse the result
+        # Parse the result
+        if hasattr(search_result, 'raw'):
+            raw_output = search_result.raw
+            # Strip markdown code blocks if present
+            if "```json" in raw_output:
+                raw_output = raw_output.replace("```json", "").replace("```", "")
+            elif "```" in raw_output:
+                raw_output = raw_output.replace("```", "")
             
-            discover_task = tasks.discover_and_extract_content_task(source_discoverer, skill)
-            search_crew = CrewAI(
-                agents=[source_discoverer],
-                tasks=[discover_task],
-                process=Process.sequential,
-                verbose=False
-            )
-            # Use kickoff_async for async agents
-            search_result = await search_crew.kickoff_async()
-            
-            # Parse the result from the tool - CrewAI returns objects, not JSON strings
             try:
-                # CrewAI returns result objects, so we need to access their raw attribute
-                if hasattr(search_result, 'raw'):
-                    result_dict = json.loads(search_result.raw)
-                elif isinstance(search_result, dict):
-                    result_dict = search_result
+                result_data = json.loads(raw_output)
+            except json.JSONDecodeError:
+                logging.warning("Failed to parse JSON directly, attempting to find JSON substring")
+                # Fallback: try to find the first { and last }
+                start = raw_output.find('{')
+                end = raw_output.rfind('}') + 1
+                if start != -1 and end != -1:
+                    result_data = json.loads(raw_output[start:end])
                 else:
-                    raise ValueError(f"Unexpected result type: {type(search_result)}")
-                
-                # Handle the case where result_dict might have 'all_sources' key directly
-                if 'all_sources' in result_dict:
-                    source_entries = result_dict['all_sources']
-                else:
-                    # Fallback: treat result_dict as containing source entries directly
-                    source_entries = result_dict if isinstance(result_dict, list) else [result_dict]
-                
-                # Extract the first source entry (should contain the skill)
-                if source_entries:
-                    source_entry = source_entries[0]
-                    # Handle both dict and SkillSources object
-                    if isinstance(source_entry, dict):
-                        extracted_content = source_entry.get('extracted_content', {})
-                    else:
-                        # Handle SkillSources object
-                        extracted_content = source_entry.extracted_content.model_dump() if hasattr(source_entry, 'extracted_content') else {}
-                    
-                    all_sources[skill] = {
-                        "extracted_content": extracted_content,
-                        "status": "success"
-                    }
-                    logging.info(f"   Content extracted for {skill}")
-                else:
-                    all_sources[skill] = {
-                        "extracted_content": {},
-                        "status": "no_content"
-                    }
-                    logging.info(f"   No content found for {skill}")
-                    
-            except Exception as e:
-                logging.error(f"Error parsing result for {skill}: {e}")
-                logging.error(f"Raw response type: {type(search_result)}")
-                all_sources[skill] = {
-                    "extracted_content": {},
-                    "status": "failed"
-                }
-                
-        except Exception as e:
-            logging.error(f"Error processing {skill}: {str(e)}", exc_info=True)
-            all_sources[skill] = {
-                "extracted_content": {},
-                "status": "failed"
-            }
-    
-    logging.info("=" * 80)
-    logging.info("PROCESSING COMPLETE")
-    logging.info("=" * 80)
-    logging.info(f"  Input skills: {len(skills_from_agent1)}")
-    logging.info(f"  Skills processed: {len(all_sources)}")
-    logging.info(f"  Successful searches: {len([r for r in all_sources.values() if r.get('status') == 'success'])}")
-    logging.info(f"  Failed searches: {len([r for r in all_sources.values() if r.get('status') == 'failed'])}")
-    
-    # Save in proper schema format
-    schema_output = {
-        "all_sources": [
-            {
-                "skill": skill,
-                "extracted_content": data["extracted_content"]
-            }
-            for skill, data in all_sources.items()
-        ]
-    }
-    
-    output_path = "app/tests/discovered_sources.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(schema_output, f, indent=2, ensure_ascii=False)
-    
-    logging.info(f"\n Results saved to: {output_path}")
-    logging.info("=" * 80)
-    
-    return {
-        "input_skills": skills_from_agent1,
-        "status": "success" if all_sources else "failed"
-    }
+                    raise
+        elif isinstance(search_result, dict):
+            result_data = search_result
+        else:
+            result_data = json.loads(str(search_result))
+
+        # Save results
+        output_path = "app/tests/discovered_sources.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result_data, f, indent=2, ensure_ascii=False)
+        
+        logging.info(f"\n Results saved to: {output_path}")
+        
+        return {
+            "input_skills": skills_from_agent1,
+            "status": "success"
+        }
+
+    except Exception as e:
+        logging.error(f"Error during search execution: {e}", exc_info=True)
+        return {
+            "input_skills": skills_from_agent1,
+            "status": "failed"
+        }
 
 
 if __name__ == "__main__":

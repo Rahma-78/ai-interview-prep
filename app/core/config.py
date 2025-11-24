@@ -29,19 +29,28 @@ class Settings(BaseSettings):
     CREWAI_TELEMETRY_OPT_OUT: bool = True
     REQUESTS_PER_MINUTE: int = 10
     
-    # Timeout configurations (in seconds)
-    SEARCH_TIMEOUT: int = 90
-    SUMMARY_TIMEOUT: int = 45
-    CONTENT_ENHANCEMENT_TIMEOUT: int = 30
-    QUESTION_GENERATION_TIMEOUT: int = 120
-    MAX_RETRIES: int = 2
+    # Service Specific Limits (Requests Per Minute)
+    GEMINI_RPM: int = 10
+    OPENROUTER_RPM: int = 20
+    GROQ_RPM: int = 30
     
     # Agent Configuration
     AGENT_MAX_ITER: int = 3
     AGENT_MAX_RPM: int = 10
     
-    # Service Specific Limits
-    GEMINI_RPM: int = 10
+    # Retry Configuration
+    RETRY_MAX_ATTEMPTS: int = 3
+    RETRY_BASE_DELAY: float = 1.0
+    RETRY_MAX_DELAY: float = 60.0
+    RETRY_MIN_QUOTA_DELAY: float = 30.0
+    
+    # Fail-Fast Configuration (for user-facing or latency-sensitive operations)
+    RETRY_FAIL_FAST_MAX_RETRIES: int = 1
+    RETRY_FAIL_FAST_MAX_DELAY: float = 5.0
+    RETRY_FAIL_FAST_MIN_QUOTA_DELAY: float = 3.0
+    
+    # Logging
+    LOG_LEVEL_UTILS: str = "INFO"
     
 
 # Initialize settings and validate API keys

@@ -61,9 +61,9 @@ class InterviewPrepCrew:
 
         # Create the second task - discover sources based on skills
         # This task uses the skills extracted from the previous task to find relevant sources
+        # Note: We do not pass 'skills' explicitly; CrewAI passes the output of skills_task via context.
         discover_task = self.tasks.discover_and_extract_content_task(
-            source_discoverer,
-            ""  # Empty string - CrewAI will automatically provide the context from skills_task
+            source_discoverer
         )
 
         # Create the third task - generate questions based on skills and sources

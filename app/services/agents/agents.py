@@ -1,5 +1,5 @@
 from crewai import Agent 
-from typing import Callable, Dict, List
+from typing import List, Dict, Callable
 
 from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills
 from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter
@@ -29,17 +29,16 @@ class InterviewPrepAgents:
         Defines the agent responsible for analyzing resumes and extracting technical skills.
         """
         return Agent( 
-            role="Technical Skills Intelligence Analyst",
+            role="Expert technical skill extraction agent",
             goal=(
-                "Extract exactly 10 high-impact technical skills from the resume. "
-                "Focus on core competencies suitable for conceptual interview questions."
+                "Extract exactly 10 high-impact technical skills from the resume that are ideal for verbal technical interviews. "
+                "Focus on core competencies, architectural concepts, and design principles."
             ),
             backstory=(
-                "You are an elite technical skills analyst "
-                "Your specialty is identifying skills that reveal a candidate's conceptual understanding, not just tool familiarity. "
-                "You distinguish between surface-level buzzwords and genuine technical competencies by analyzing: "
-                "You prioritize skills that can be explored through architecture discussions, design trade-offs, "
-                "and problem-solving scenarios rather than syntax or coding exercises. "
+                "You are an elite technical skills analyst specializing in preparing candidates for high-level engineering interviews. "
+                "Your expertise lies in identifying skills that reveal a candidate's depth of understanding, problem-solving abilities, and architectural vision. "
+                "You distinguish between surface-level tools and genuine technical competencies suitable for deep verbal discussion. "
+                "You prioritize skills that enable questions about 'how' and 'why' rather than just 'what'."
             ),
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
@@ -49,7 +48,6 @@ class InterviewPrepAgents:
             max_rpm=settings.AGENT_MAX_RPM,  # Increase requests per minute for faster processing
             memory=False,  # Disable memory to reduce overhead
             cache=False,  # Disable caching for faster first call
-            response_format=ExtractedSkills, # Enforce output format
          )
 
     def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:

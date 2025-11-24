@@ -26,11 +26,10 @@ llm_gemini = get_llm(
 )
 
 # Groq Llama - For skill extraction (Agent 1)
-# Using llama-3.3-70b-versatile for better function calling support
-# Let CrewAI manage tool_choice automatically
+
 llm_groq = get_llm(
     "groq/llama-3.3-70b-versatile",
-    temperature=0.2,
+    temperature=0.7,
     api_key=settings.GROQ_API_KEY,
     
 )

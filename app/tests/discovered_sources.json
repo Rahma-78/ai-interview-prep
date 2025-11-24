@@ -1,369 +1,181 @@
 {
-  "all_sources": [
+  "skills": [
     {
-      "skill": "Python",
+      "skill_name": "Data Manipulation & Visualization",
       "extracted_content": {
         "core_concepts": [
-          "Python's memory management (garbage collection, reference counting, memory pools, private heaps)",
-          "Global Interpreter Lock (GIL) and its implications for multithreaded programs (CPU-bound tasks)",
-          "Mutable (e.g., lists) vs. immutable (e.g., tuples) data types",
-          "Shallow vs. deep copies",
-          "Object-Oriented Programming (OOP) principles (inheritance, classes, objects)",
-          "Functions (lambda expressions, decorators, `pass` statement)",
-          "Modules vs. libraries, packages, namespaces",
-          "Python as an interpreted and dynamically typed language",
-          "PEP 8 (style guide for Python code)"
+          "Data Cleaning/Wrangling: This involves handling missing values, dealing with outliers, correcting inconsistent data, and transforming data into a suitable format for analysis and visualization. Techniques include imputation (mean, median, mode), deletion of rows/columns, and standardization.",
+          "Data Transformation: Normalization, aggregation (e.g., SUM, AVG), pivoting, and unpivoting data to derive new features or change data granularity for better analysis.",
+          "Exploratory Data Analysis (EDA): The process of analyzing data sets to summarize their main characteristics, often with visual methods, to discover patterns, spot anomalies, test hypotheses, and check assumptions.",
+          "Visualization Types: Understanding the appropriate use cases for various charts (e.g., bar charts for categorical comparison, line charts for trends over time, scatter plots for relationships, histograms for distribution).",
+          "Dashboard Design Principles: Clarity, conciseness, consistency, and contextual relevance are crucial for effective dashboards. Key performance indicators (KPIs) should be prominent, and interactivity enhances user experience.",
+          "Feature Engineering: The process of creating new features from existing raw data to improve the performance of machine learning models or enhance analytical insights. This often involves transformations, aggregations, and combinations of variables.",
+          "Data Joins and Merges: Understanding different types of joins (INNER, LEFT, RIGHT, FULL OUTER) and their implications on data integration and record matching across multiple datasets.",
+          "Data Validation: The process of ensuring that data is clean, correct, and useful for analysis, often involving checks for data types, ranges, uniqueness, and completeness.",
+          "Regular Expressions (Regex): Powerful tools for pattern matching and text manipulation, crucial for cleaning unstructured or semi-structured text data.",
+          "Window Functions (SQL/Pandas): Performing calculations across a set of table rows that are somehow related to the current row, such as calculating moving averages, rankings, or cumulative sums.",
+          "Pre-attentive Attributes: Visual properties (e.g., color, size, orientation, shape) that are processed subconsciously by the brain, allowing for quick identification of patterns or anomalies.",
+          "Gestalt Principles of Perception: Principles like proximity, similarity, closure, and continuity, which explain how humans perceive visual elements as unified wholes, crucial for effective grouping and organization in visualizations.",
+          "Color Theory in Visualization: Understanding the use of color for categorical distinction, sequential scales, diverging scales, and avoiding accessibility issues (e.g., colorblindness).",
+          "Visual Encoding: The process of mapping data attributes to visual properties (e.g., mapping sales to bar length, time to x-axis position).",
+          "Dashboarding vs. Reporting: Differentiating between interactive, real-time dashboards designed for monitoring and static reports for detailed analysis or historical records."
         ],
         "problem_solving": [
-          "Efficient data manipulation techniques (list comprehensions)",
-          "Handling missing or corrupted data",
-          "Advantages of NumPy arrays over standard nested lists (performance, memory efficiency, vectorized operations)",
-          "Reading CSV files into Pandas DataFrames",
-          "Calculating correlation matrices for data exploration",
-          "Concurrency (multithreading for I/O-bound tasks, multiprocessing for CPU-bound tasks)"
+          "Handling Missing Data: How would you deal with a column having 40% missing values? (e.g., evaluate impact, impute if justifiable, or drop column).",
+          "Outlier Detection and Treatment: Techniques like IQR method, Z-score, or visual inspection using box plots.",
+          "Choosing the Right Visualization: Given a specific dataset and business question, selecting the most effective visualization type (e.g., comparing sales across regions vs. showing sales trend over time).",
+          "Data Aggregation Challenges: Ensuring correct aggregation levels and avoiding data loss or misrepresentation during summary operations.",
+          "Dealing with Duplicate Records: Identifying and removing duplicates based on specific key columns.",
+          "Transforming Wide to Long Format (and vice-versa): Practical applications of `melt` and `pivot_table` (Pandas) or equivalent SQL operations for data reshaping.",
+          "Aggregating Data with Multiple Conditions: Using `GROUP BY` with `HAVING` clauses or conditional aggregations (e.g., `SUM(CASE WHEN...)`) to answer complex business questions.",
+          "String Manipulation: Extracting specific patterns from text fields, cleaning free-text entries, or standardizing categorical strings.",
+          "Effectively Conveying Distribution: Using histograms, box plots, or violin plots to show data distribution instead of simple averages.",
+          "Showing Relationships Between Multiple Variables: Utilizing scatter plot matrices, heatmaps, or parallel coordinates plots.",
+          "Designing for Accessibility: Choosing color palettes and text sizes that are legible for users with visual impairments.",
+          "Reducing Cognitive Load: Simplifying complex information by breaking it down into smaller, digestible visualizations and providing clear labels."
         ],
-        "key_terminology": [
-          "Local and global variables",
-          "Decorators",
-          "Lambda functions",
-          "Deep vs. shallow copies",
-          "Modules vs. libraries",
-          "PEP 8",
-          "Python namespaces",
-          "Global Interpreter Lock (GIL)",
-          "Pickling and unpickling (object serialization)",
-          "Python literals"
+        "terminology": [
+          "Pivot/Unpivot: Reshaping data by rotating rows into columns or vice-versa.",
+          "Granularity: The level of detail in a dataset.",
+          "Imputation: Filling in missing data with substituted values.",
+          "Dashboard: A visual display of key information and metrics on a single screen.",
+          "Storytelling with Data: Presenting data insights in a narrative form to engage the audience and convey a message.",
+          "ETL (Extract, Transform, Load): A data integration process that combines data from multiple sources. Data manipulation is a core part of the 'Transform' stage.",
+          "Standardization/Normalization: Scaling numerical features to a standard range or distribution.",
+          "Discretization/Binning: Grouping continuous data into discrete bins or intervals.",
+          "Categorical Encoding: Converting categorical variables into numerical representations (e.g., One-Hot Encoding, Label Encoding).",
+          "Lag/Lead Functions: SQL window functions to access data from preceding or succeeding rows within the same result set.",
+          "Chartjunk: Superfluous or unnecessary visual elements that detract from the clarity of a visualization.",
+          "Small Multiples: A series of similar graphs or charts, using the same scale and axes, to compare different subsets of data.",
+          "Infographics: Visual representations of information, data, or knowledge intended to present information quickly and clearly.",
+          "Drill-down/Drill-through: Capabilities in dashboards allowing users to navigate from a summary view to more detailed data.",
+          "Data Storytelling: The ability to communicate insights from data in a compelling narrative format using visualizations."
         ],
         "best_practices": [
-          "Prioritizing readable and simple syntax",
-          "Modular programming (code organization, reusability, maintainability)",
-          "Efficient memory management",
-          "Selection of appropriate data structures (e.g., NumPy for numerical operations)"
+          "Understand the Audience: Tailor visualizations and data presentations to the technical and business understanding of the target audience.",
+          "Keep it Simple: Avoid chartjunk and unnecessary visual elements that can distract from the message.",
+          "Consistent Aesthetics: Use consistent color schemes, fonts, and labeling across visualizations in a report or dashboard.",
+          "Interactivity: Implement filters, drill-downs, and tooltips to allow users to explore data dynamically.",
+          "Data Integrity: Always validate data after manipulation steps to ensure accuracy.",
+          "Version Control for Data Manipulation Scripts: Tracking changes to scripts (e.g., Python, R, SQL) used for data cleaning and transformation.",
+          "Modularity and Reusability: Writing functions or reusable scripts for common data manipulation tasks.",
+          "Documentation: Clearly documenting data sources, transformation steps, assumptions made, and decisions taken.",
+          "Error Handling: Implementing robust error handling mechanisms in data processing pipelines.",
+          "Performance Optimization: Writing efficient queries and code for large datasets, using indexing in databases, and vectorized operations in programming languages (e.g., Pandas).",
+          "Choose the Right Chart for the Data and Message: Avoid using pie charts for more than 2-3 categories, use bar charts for comparisons, line charts for trends.",
+          "Label Clearly and Concisely: Ensure all axes, titles, and legends are easy to understand.",
+          "Provide Context: Always include units, timeframes, and relevant comparisons to help interpret the data.",
+          "Emphasize Key Insights: Use color, annotations, or bolding to draw attention to the most important findings.",
+          "Iterate and Gather Feedback: Develop visualizations iteratively and get feedback from intended users to improve their effectiveness."
         ],
-        "common_challenges": [
-          "Managing concurrency effectively (GIL limitations, multiprocessing as a solution for CPU-bound tasks)",
-          "Memory management (understanding garbage collector)",
-          "Processing large datasets efficiently",
-          "Handling data imperfections (using libraries like Pandas and NumPy)"
+        "challenges": [
+          "Data Overload: Presenting too much information, leading to cognitive burden for the viewer.",
+          "Misleading Visualizations: Using inappropriate scales, chart types, or color choices that can distort data perception.",
+          "Performance Issues: Slow loading dashboards or visualizations due to large datasets or complex calculations.",
+          "Maintaining Data Quality: Ensuring consistency and accuracy of data feeds for visualizations over time.",
+          "Tool Limitations: Working within the constraints of specific visualization tools (e.g., Tableau, Power BI, Matplotlib).",
+          "Data Heterogeneity: Dealing with data from various sources in different formats and structures.",
+          "Scalability: Manipulating extremely large datasets that do not fit into memory.",
+          "Maintaining Data Lineage: Tracking the origin and transformations applied to data throughout its lifecycle.",
+          "Domain Knowledge Dependency: Effective data manipulation often requires deep understanding of the business context and data semantics.",
+          "Dealing with \"Dirty Data\": The inherent messiness and inconsistencies in real-world data, requiring significant effort in cleaning.",
+          "Bias in Visualization: Unintentionally or intentionally creating visualizations that support a particular viewpoint or distort reality.",
+          "Overlapping Data Points (Clutter): Especially in scatter plots with many data points, making it difficult to discern patterns.",
+          "Choosing Appropriate Scales: Deciding between linear, logarithmic, or other scales to best represent data without distortion.",
+          "Maintaining Consistency Across Multiple Visualizations: Ensuring a unified look and feel for a cohesive dashboard or report.",
+          "Data Volume Limitations of Visualization Tools: Some tools struggle with rendering extremely large datasets efficiently."
         ]
       }
     },
     {
-      "skill": "TensorFlow",
-      "extracted_content": {}
-    },
-    {
-      "skill": "PyTorch",
+      "skill_name": "SQL Database",
       "extracted_content": {
         "core_concepts": [
-          "Tensor: multi-dimensional array, fundamental for data representation and computation. Knowledge of tensor operations, data types, device placement (CPU/GPU), and memory management.",
-          "Autograd engine: PyTorch's automatic differentiation system. Understanding how gradients are computed, the computational graph (dynamic nature), `requires_grad`, `grad_fn`, and disabling gradient computation.",
-          "`torch.nn` module: Central to defining neural networks. Encompasses `nn.Module` (custom layer/model creation), `nn.functional` (stateless functional operations), and pre-built layers (`Linear`, `Conv2d`, `BatchNorm`).",
-          "`torch.optim` module: Covers various optimization algorithms (SGD, Adam, RMSprop) and learning rate schedulers.",
-          "`torch.utils.data.Dataset` and `torch.utils.data.DataLoader`: Essential for data handling, creating custom datasets, efficient loading/batching, and data transformations/augmentations.",
-          "Dynamic computation graph: Provides flexibility for control flow and debugging."
+          "Relational Database Model: Understanding tables, columns, rows, primary keys, foreign keys, and their relationships.",
+          "ACID Properties: Atomicity, Consistency, Isolation, Durability – fundamental principles ensuring reliable transaction processing.",
+          "Normalization: The process of organizing data in a database to reduce data redundancy and improve data integrity (1NF, 2NF, 3NF, BCNF).",
+          "Indexes: Data structures that improve the speed of data retrieval operations on a database table at the cost of additional writes and storage space. Types include clustered and non-clustered.",
+          "Stored Procedures and Functions: Pre-compiled SQL code stored in the database, allowing for reusability, modularity, and enhanced security.",
+          "Transactions: A single logical unit of work, comprising one or more SQL statements, that is treated as an indivisible sequence of operations.",
+          "Concurrency Control: Mechanisms (e.g., locking, multi-version concurrency control - MVCC) to manage simultaneous access to shared database resources without conflicts.",
+          "Database Sharding/Partitioning: Distributing data across multiple database instances or tables to improve scalability and performance.",
+          "Data Warehousing Concepts: Understanding OLTP vs. OLAP, star schema, snowflake schema, and fact/dimension tables.",
+          "NoSQL vs. SQL: Knowing the trade-offs and use cases for relational databases versus various NoSQL databases (document, key-value, graph, column-family).",
+          "Constraints: Rules enforced on data columns to limit the type of data that can be entered into a table (e.g., `NOT NULL`, `UNIQUE`, `PRIMARY KEY`, `FOREIGN KEY`, `CHECK`, `DEFAULT`).",
+          "Set Operations: Understanding `UNION`, `UNION ALL`, `INTERSECT`, and `EXCEPT` for combining or comparing result sets from multiple `SELECT` statements.",
+          "Triggers: Special types of stored procedures that are automatically executed (fired) when a data modification event (INSERT, UPDATE, DELETE) occurs on a table.",
+          "Views: Virtual tables based on the result-set of a SQL query. They do not store data themselves but provide a way to simplify complex queries and enhance security.",
+          "Common Data Types: Familiarity with `INT`, `VARCHAR`, `DATE`, `DECIMAL`, `BOOLEAN`, etc., and their appropriate usage."
         ],
         "problem_solving": [
-          "Constructing complete deep learning workflows: Understanding typical training loop structure (forward/backward passes, optimizer steps, loss calculation).",
-          "Transfer learning: Loading pre-trained models, freezing layers, and fine-tuning specific parts of the network.",
-          "Batch normalization: Stabilizing and accelerating training.",
-          "Advanced architectures: Transformers and attention mechanisms (multi-head self-attention, positional encodings).",
-          "Handling imbalanced datasets: Using class weights with loss functions (e.g., `CrossEntropyLoss`).",
-          "Debugging complex models: Systematic approaches to isolate issues (hooks, visualizing activations/gradients, simplifying models).",
-          "Optimizing training for large datasets/models: Distributed training (DDP), gradient accumulation, mixed-precision training, efficient data loading.",
-          "Handling variable-length sequences: Custom `DataLoader`s with padding and masking strategies.",
-          "Implementing custom operations: Designing and implementing custom `autograd` functions.",
-          "Overfitting: Regularization techniques (dropout, L1/L2), early stopping, data augmentation."
+          "Complex Joins: Writing queries involving multiple `JOIN` types and conditions to retrieve data from several tables (e.g., finding customers who bought product X but not product Y).",
+          "Subqueries and CTEs (Common Table Expressions): Using nested queries or `WITH` clauses to break down complex problems into smaller, more manageable steps.",
+          "Window Functions: Solving problems requiring calculations over a specific \"window\" of rows, such as ranking, running totals, or finding previous/next values within a group.",
+          "Aggregation and Filtering: Combining `GROUP BY`, `HAVING`, and `WHERE` clauses to summarize data based on various criteria.",
+          "Handling NULL values: Differentiating between `NULL` and empty strings/zeros, and using functions like `COALESCE` or `IS NULL` correctly.",
+          "Optimizing Subqueries: Converting correlated subqueries to joins or CTEs for better performance.",
+          "Handling Large Deletions/Updates: Using techniques like batching or temporary tables to avoid locking entire tables.",
+          "Designing an ETL Process: Outlining how to extract data from sources, transform it, and load it into a target database/data warehouse.",
+          "Troubleshooting Performance Issues: Analyzing `EXPLAIN` plans, identifying missing indexes, or poorly written joins.",
+          "Data Migration Strategies: Planning for migrating data between different database systems or versions.",
+          "Ranking Problems: Using `RANK()`, `DENSE_RANK()`, `ROW_NUMBER()` window functions to assign ranks based on specific criteria.",
+          "Finding Nth Highest/Lowest: Techniques using `LIMIT` and `OFFSET` or window functions.",
+          "Conditional Logic in Queries: Employing `CASE` statements to perform different actions or return different values based on specified conditions.",
+          "Pivoting Data: Transforming rows into columns using aggregate functions and `CASE` statements or specific `PIVOT` operators if available in the SQL dialect.",
+          "Date and Time Functions: Manipulating and extracting information from date/time columns (e.g., `DATE_ADD`, `DATEDIFF`, `EXTRACT`)."
         ],
-        "key_terminology": [
-          "Tensor",
-          "Autograd",
-          "`torch.nn` module",
-          "`nn.Module`",
-          "`nn.functional`",
-          "`torch.optim` module",
-          "`torch.utils.data.Dataset`",
-          "`torch.utils.data.DataLoader`",
-          "Dynamic computation graph",
-          "Transfer learning",
-          "Batch normalization",
-          "Transformer",
-          "Attention",
-          "Hooks: Mechanisms to inject custom code into forward/backward pass for debugging, visualization, or gradient modification.",
-          "DistributedDataParallel (`DDP`): Primary tool for multi-GPU/multi-node distributed training.",
-          "TorchServe: Tool for deploying PyTorch models in production.",
-          "Gradient Clipping: Technique to prevent exploding gradients.",
-          "Mixed Precision Training: Using 16-bit and 32-bit floating-point types to reduce memory and speed up computation."
-        ],
-        "best_practices": [
-          "Performance optimization: On GPUs, `torch.cuda` functionalities, device management, efficient tensor operations.",
-          "Implementing custom modules, layers, and activation functions using `nn.Module`.",
-          "Effective debugging of neural networks: Identifying common issues (non-converging models, exploding/vanishing gradients).",
-          "Memory profiling: Identifying and resolving memory bottlenecks.",
-          "Model saving and loading (`torch.save`, `torch.load`), model versioning, CI/CD strategies.",
-          "Reproducible experiments and consistent environments."
-        ],
-        "typical_challenges": [
-          "Debugging complex models",
-          "Optimizing training for large datasets/models",
-          "Handling variable-length sequences",
-          "Implementing custom operations",
-          "Overfitting"
-        ]
-      }
-    },
-    {
-      "skill": "Scikit-learn",
-      "extracted_content": {}
-    },
-    {
-      "skill": "FastAPI",
-      "extracted_content": {
-        "core_concepts": [
-          "FastAPI is built upon Starlette for web parts and Pydantic for data parts, ensuring high performance and automatic validation.",
-          "Key components include the FastAPI application instance, which serves as the entry point, and endpoints defined by path operations that handle specific HTTP methods (GET, POST, PUT, DELETE, etc.).",
-          "Asynchronous programming is a fundamental aspect, enabling FastAPI to handle multiple concurrent requests efficiently using ASGI (Asynchronous Server Gateway Interface) and non-blocking I/O operations.",
-          "Python's type hints are extensively used for automatic request validation, response serialization, and documentation generation.",
-          "Pydantic models are central to data validation and serialization, defining the structure and constraints of incoming and outgoing data, and automatically generating OpenAPI (Swagger UI) and ReDoc documentation.",
-          "Dependency Injection (DI) allows for organized, reusable, and testable code by providing external dependencies (like database connections or authentication logic) to endpoint functions.",
-          "Path parameters capture dynamic segments of a URL (e.g., `/items/{item_id}`).",
-          "Query parameters are used for filtering or optional data (e.g., `/users?active=true`).",
-          "Request bodies, typically defined using Pydantic models, handle structured data sent with requests.",
-          "Response models define the structure of data returned to the client."
-        ],
-        "problem_solving": [
-          "Dependency Injection: Used to manage shared resources and services, abstract business logic, and enforce authentication/authorization across multiple endpoints.",
-          "Middleware: Intercepts requests and responses, allowing for cross-cutting concerns like logging, adding custom headers, authentication, authorization, and Gzip compression.",
-          "Background Tasks: Facilitate performing operations after sending a response to the client, such as sending emails, processing uploaded files, or updating caches, without blocking the main thread.",
-          "Error Handling: FastAPI provides mechanisms to handle validation errors gracefully and raise custom `HTTPException` instances with specific status codes and messages.",
-          "Testing: FastAPI applications can be easily tested using `pytest` and `TestClient` to simulate API requests, allowing for unit, integration, and end-to-end testing."
-        ],
-        "key_terminology": [
-          "ASGI (Asynchronous Server Gateway Interface): A specification for Python web servers and applications to communicate asynchronously.",
-          "Starlette: The lightweight ASGI framework that FastAPI is built upon.",
-          "Pydantic: A data validation and settings management library that FastAPI uses for data validation, serialization, and automatic documentation.",
-          "OpenAPI (Swagger UI/ReDoc): Industry standards for defining REST APIs. FastAPI automatically generates interactive API documentation.",
-          "Path Parameters: Variables embedded directly in the URL path, used to identify specific resources.",
-          "Query Parameters: Optional key-value pairs appended to the URL after a question mark, used for filtering or pagination.",
-          "Request Body: The data sent by the client in the body of an HTTP request, typically JSON, validated by Pydantic models.",
-          "Response Model: A Pydantic model used to define and serialize the structure of the data returned by an API endpoint."
+        "terminology": [
+          "DDL (Data Definition Language): SQL commands like `CREATE`, `ALTER`, `DROP` for defining database schema.",
+          "DML (Data Manipulation Language): SQL commands like `SELECT`, `INSERT`, `UPDATE`, `DELETE` for managing data.",
+          "DCL (Data Control Language): SQL commands like `GRANT`, `REVOKE` for permissions.",
+          "TCL (Transaction Control Language): SQL commands like `COMMIT`, `ROLLBACK`, `SAVEPOINT` for managing transactions.",
+          "Cardinality: The uniqueness of data values contained in a column.",
+          "Referential Integrity: A system of rules that a database uses to ensure that relationships between records in related tables are valid.",
+          "MVCC (Multi-Version Concurrency Control): A concurrency control method used by many database management systems to provide concurrent access to the database without locking.",
+          "CAP Theorem: Consistency, Availability, Partition tolerance – a fundamental theorem in distributed systems, stating that it's impossible for a distributed data store to simultaneously provide more than two out of these three guarantees.",
+          "Materialized View: A database object that contains the results of a query, physically stored and refreshed periodically, to speed up query execution.",
+          "Replication: The process of copying data from one database server to another to ensure data consistency, high availability, and fault tolerance.",
+          "Federated Database: A type of meta-database management system that transparently maps multiple autonomous component databases into a single federated database.",
+          "Aggregate Functions: Functions that perform a calculation on a set of rows and return a single value (e.g., `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`).",
+          "Scalar Functions: Functions that operate on a single value and return a single value (e.g., `UPPER`, `LENGTH`, `ROUND`).",
+          "Self-Join: A join operation used to join a table to itself.",
+          "Cross Join (Cartesian Product): A join that returns the Cartesian product of rows from two or more tables.",
+          "Schema: The logical structure of the database, defining tables, columns, data types, indexes, and constraints."
         ],
         "best_practices": [
-          "RESTful API Design: Adhering to RESTful principles, including proper resource naming, appropriate HTTP status codes, and clear error handling.",
-          "Security: Implement robust security measures such as OAuth2 with Password (and hashing), JWT tokens, API key authentication, and addressing Cross-Origin Resource Sharing (CORS). Input validation is critical.",
-          "Testing Strategy: Comprehensive testing (unit, integration, end-to-end) using tools like `pytest`.",
-          "Performance Optimization: Leveraging asynchronous endpoints for I/O-bound tasks, implementing caching (e.g., with Redis), using Gunicorn with Uvicorn workers, enabling database connection pooling, and optimizing database queries.",
-          "Scalability: Designing for scalability involves asynchronous request handling, effective use of dependency injection, and implementing background tasks.",
-          "API Versioning: Employing versioning strategies (e.g., `/v1/users`) ensures backward compatibility."
+          "Use Aliases: For tables and columns to improve readability of complex queries.",
+          "Specify Columns in SELECT: Avoid `SELECT *` in production code for performance and clarity.",
+          "Use `EXPLAIN` or `EXPLAIN ANALYZE`: To understand query execution plans and identify bottlenecks.",
+          "Index Strategically: Only index columns frequently used in `WHERE` clauses, `JOIN` conditions, or `ORDER BY` clauses.",
+          "Batch Operations: For `INSERT` or `UPDATE` statements to reduce overhead.",
+          "Normalize Data Appropriately: Balance normalization with denormalization for performance if necessary.",
+          "Database Design Principles: Adhering to good schema design, choosing appropriate data types, and defining constraints.",
+          "Regular Database Maintenance: Running statistics, rebuilding indexes, and performing backups.",
+          "Security Best Practices: Principle of least privilege, input validation to prevent SQL injection, and encryption.",
+          "Code Reviews for SQL Queries: Ensuring optimal performance, correctness, and adherence to standards.",
+          "Load Testing and Stress Testing: Simulating high traffic to identify performance bottlenecks before production deployment.",
+          "Consistent Naming Conventions: For tables, columns, views, and stored procedures.",
+          "Use Prepared Statements: To prevent SQL injection attacks and improve performance by pre-compiling the query plan.",
+          "Handle Errors Gracefully: In stored procedures or application code interacting with the database.",
+          "Regularly Review and Optimize Queries: Especially those running frequently or against large datasets.",
+          "Understand Database-Specific Dialects: Be aware of differences between SQL (e.g., T-SQL, PL/pgSQL, MySQL SQL)."
         ],
-        "challenges_and_solutions": [
-          "Data Validation Failures: FastAPI, with Pydantic, automatically validates data against defined models and provides clear, detailed error messages.",
-          "Managing Asynchronous Operations: Proper management of `async`/`await` keywords and understanding Python's event loop are essential to avoid complexities like race conditions.",
-          "Dependency Management in Complex Applications: FastAPI's `Depends` function streamlines this by automatically handling the lifecycle and scope of dependencies.",
-          "Securing Endpoints: FastAPI offers built-in tools like `OAuth2PasswordBearer` and robust support for JWT.",
-          "Performance Bottlenecks: Identifying and resolving performance issues often involves profiling I/O-bound operations, leveraging FastAPI's asynchronous nature, implementing caching, and optimizing database interactions.",
-          "CORS Issues: FastAPI provides `CORSMiddleware` to easily define allowed origins, methods, and headers.",
-          "Handling Large File Uploads: FastAPI can handle `UploadFile` objects, allowing processing in chunks to optimize memory usage, potentially combined with `StreamingResponse`."
-        ]
-      }
-    },
-    {
-      "skill": "Docker",
-      "extracted_content": {
-        "core_concepts": [
-          "Docker is an open-source platform that automates the deployment, scaling, and management of applications within lightweight, isolated environments called containers.",
-          "It addresses the \"it works on my machine\" problem by ensuring consistency across development, testing, and production environments.",
-          "Docker operates on a client-server architecture. The Docker client interacts with the Docker daemon (dockerd), which manages Docker objects such as images, containers, networks, and volumes.",
-          "A Docker Image is a read-only template containing the application code, runtime, libraries, dependencies, and configuration needed to run an application.",
-          "Images are built from a Dockerfile, a text file with instructions for assembling the image.",
-          "Each instruction in a Dockerfile creates an immutable, read-only layer, which Docker caches and shares between images, enhancing efficiency and reducing storage.",
-          "A Docker Container is a runnable instance of an image, isolated from the host and other containers, providing a consistent environment.",
-          "Unlike virtual machines (VMs) which virtualize hardware and run a full guest OS, containers share the host OS kernel, making them significantly lighter, faster to start, and more resource-efficient.",
-          "Dockerfile Instructions: `FROM` (base image), `RUN` (executes commands during build), `COPY` (copies files), `ADD` (similar to `COPY`, handles URLs/tar), `CMD` (default arguments for container), `ENTRYPOINT` (configures container as executable), `EXPOSE` (informs Docker of listening ports).",
-          "Docker Compose: A tool for defining and running multi-container Docker applications using a single YAML file (`docker-compose.yml`).",
-          "Docker Swarm: Docker's native container orchestration tool for managing a cluster of Docker engines.",
-          "Docker Volumes: Preferred mechanism for persisting data generated by and used by Docker containers, stored on the host filesystem.",
-          "Docker Networks: Bridge Network (default for single host), Overlay Network (for multi-host/Swarm clusters).",
-          "Namespaces: Linux kernel features for isolation (PID, NET, MNT) for each container.",
-          "cgroups (Control Groups): Linux kernel features that limit and isolate resource usage (CPU, memory, disk I/O) for containers.",
-          "BuildKit: Docker feature enhancing build performance, parallel execution, advanced caching, and multi-stage builds."
-        ],
-        "problem_solving": [
-          "Debugging: Inspect container logs (`docker logs <container_id>`), use `docker inspect` for detailed info, run commands inside containers (`docker exec -it <container_id> /bin/bash`). For build failures, use `--progress=plain` and `--no-cache`.",
-          "Scaling Applications: `docker service scale <servicename>=<replicacount>` in Docker Swarm; Docker Compose adjusts replica counts for multi-container apps.",
-          "Data Persistence: Volumes are the standard solution; bind mounts for direct host path mapping (useful for development).",
-          "Inter-Container Communication: User-defined bridge networks for same-host communication by name; overlay networks in Docker Swarm for multi-host communication via internal DNS service.",
-          "Image Size: Addressed by multi-stage builds, smaller base images, combining `RUN` commands, and cleaning up temporary files.",
-          "Data Persistence: Solved by using Docker volumes.",
-          "Inter-Container Communication: Managed via Docker's networking features (bridge and overlay networks).",
-          "Container Restarts/Crashes: Debug by checking logs (`docker logs`), inspecting exit codes, and implementing health checks in Dockerfiles.",
-          "Resource Management: Limit CPU and memory usage using `cgroups` through Docker's `--cpus` and `--memory` flags.",
-          "Managing Multiple Environments: Utilize separate Docker Compose files for different environments (dev, test, prod) and leverage environment variables or `.env` files."
-        ],
-        "best_practices": [
-          "Image Optimization: Multi-stage builds, lightweight base images (e.g., Alpine), combine `RUN` commands, clean up temporary files, use `.dockerignore`.",
-          "Security: Run as non-root user, use trusted images, regularly scan for vulnerabilities (Clair, Trivy, Anchore), set resource limits (`--cpus`, `--memory`), use network isolation, utilize Docker Secrets or external secret management tools.",
-          "Container Lifecycle Management: Understand `docker create`, `docker start`, `docker stop`, `docker restart`, `docker pause`, `docker unpause`, `docker rm`. Configure restart policies (e.g., `always`, `on-failure`).",
-          "Consistent images should be used across all environments."
-        ],
-        "typical_challenges": [
-          "Image Size",
-          "Data Persistence",
-          "Inter-Container Communication",
-          "Container Restarts/Crashes",
-          "Resource Management",
-          "Managing Multiple Environments"
-        ]
-      }
-    },
-    {
-      "skill": "SQL",
-      "extracted_content": {
-        "core_concepts": [
-          "SQL vs. NoSQL databases (structured nature, fixed schema, ACID properties)",
-          "Data integrity (NOT NULL, UNIQUE, PRIMARY KEY, FOREIGN KEY, CHECK constraints)",
-          "Database normalization (1NF, 2NF, 3NF, BCNF) and denormalization",
-          "Database objects (views, stored procedures, triggers, user-defined functions)",
-          "Indexing strategies (clustered, non-clustered, impact on performance)",
-          "Transaction isolation levels (Read Uncommitted, Read Committed, Repeatable Read, Serializable)",
-          "Referential integrity",
-          "Concurrency control mechanisms",
-          "Deadlocks (detection and resolution)",
-          "Execution plan",
-          "Query optimizer",
-          "Database schema and catalog",
-          "Dynamic SQL (advantages and risks like SQL injection)"
-        ],
-        "problem_solving": [
-          "Manipulating and retrieving complex data",
-          "JOIN types (INNER, LEFT, RIGHT, FULL OUTER) and decision-making between JOINs and subqueries",
-          "Window functions (ROW_NUMBER(), RANK(), DENSE_RANK(), NTILE(), LAG(), LEAD())",
-          "Common Table Expressions (CTEs) for complex and recursive queries",
-          "Set operations (UNION, UNION ALL, INTERSECT, EXCEPT)",
-          "Handling NULL values (IS NULL, COALESCE)",
-          "Date/time functions",
-          "String manipulations",
-          "Pivoting and unpivoting data (using CASE statements)",
-          "Diagnosing and resolving performance bottlenecks (interpreting execution plans, identifying missing/inefficient indexes, optimizing subqueries/joins, rewriting SQL)",
-          "Managing concurrency issues and deadlocks (understanding isolation levels, error handling, retry logic)",
-          "Dealing with missing or inconsistent data (NULL handling, data validation, cleansing)",
-          "Solving problems with complex hierarchical data structures (recursive CTEs)"
-        ],
-        "best_practices": [
-          "Query optimization (analyzing execution plans, avoiding SELECT *, applying WHERE clauses early, selecting appropriate JOIN types, strategic indexing)",
-          "Regularly updating database statistics",
-          "Database security (preventing SQL injection via parameterized queries/stored procedures, role-based access control, principle of least privilege)",
-          "Designing for data integrity",
-          "Choosing appropriate data types for storage and performance"
-        ],
-        "challenges_and_solutions": [
-          "Diagnosing and resolving performance bottlenecks",
-          "Managing concurrency issues and deadlocks",
-          "Dealing with missing or inconsistent data",
-          "Scalability concerns (optimized SQL queries, efficient database design)",
-          "Solving problems with complex hierarchical data structures using recursive CTEs"
-        ]
-      }
-    },
-    {
-      "skill": "OpenCV",
-      "extracted_content": {}
-    },
-    {
-      "skill": "Natural Language Processing (NLP)",
-      "extracted_content": {
-        "core_concepts": [
-          "Tokenization techniques (word, character, subword like Byte-Pair Encoding), including handling whitespace and punctuation.",
-          "Word embeddings (e.g., Word2Vec, GloVe) and how they capture semantic meaning and relationships.",
-          "N-grams and their role in preserving context and word order, as well as syntactic and semantic features.",
-          "Stemming and lemmatization and their impact on text normalization.",
-          "TF-IDF (Term Frequency-Inverse Document Frequency): A statistical measure reflecting a word's importance in a document relative to a corpus.",
-          "Bag-of-Words (BoW): A text representation model that ignores grammar and word order but keeps multiplicity.",
-          "Co-reference Resolution: Identifying expressions in text that refer to the same entity.",
-          "Lexical Analysis: Converting character sequences into token sequences for word identification and classification.",
-          "Part-of-Speech (POS) Tagging: Assigning grammatical categories to words.",
-          "Named Entity Recognition (NER): Identifying and classifying entities like people, organizations, locations.",
-          "Attention Mechanisms: Crucial components in transformer models, allowing the model to focus on relevant parts of the input sequence."
-        ],
-        "problem_solving": [
-          "Preprocessing pipeline: cleaning noisy text data (normalization, misspelling removal, filtering non-textual elements like HTML tags) and preparing data for model input.",
-          "Common NLP tasks: text classification (e.g., spam detection, sentiment analysis), machine translation, question answering, summarization, and topic modeling.",
-          "Various modeling approaches: traditional machine learning techniques (e.g., logistic regression for sentiment analysis) to deep learning architectures.",
-          "Latent Semantic Indexing (LSI) for discovering hidden relationships between words.",
-          "Managing noisy text data effectively through preprocessing techniques.",
-          "Handling sarcasm, negation, or contextual subtleties in sentiment analysis.",
-          "Evolution from Recurrent Neural Networks (RNNs), LSTMs, and GRUs to transformer architectures (BERT, GPT) for addressing sequence modeling challenges and capturing long-range dependencies.",
-          "Transfer learning and domain adaptation for NLP models to address challenges in data scarcity and generalization."
-        ],
-        "key_terminology": [
-          "Tokenization",
-          "Word Embeddings",
-          "TF-IDF (Term Frequency-Inverse Document Frequency)",
-          "Bag-of-Words (BoW)",
-          "Co-reference Resolution",
-          "Lexical Analysis",
-          "Part-of-Speech (POS) Tagging",
-          "Named Entity Recognition (NER)",
-          "Attention Mechanisms"
-        ],
-        "best_practices": [
-          "Strategies for handling out-of-vocabulary (OOV) words in NLP models.",
-          "Choosing appropriate evaluation metrics for different NLP tasks (e.g., precision, recall, F1-score for classification; BLEU score for machine translation) and explaining their mathematical formulations.",
-          "Optimizing models, handling complex data challenges, and the trade-offs involved in deploying NLP solutions.",
-          "Familiarity with essential NLP libraries like NLTK, spaCy, and Hugging Face Transformers, and their practical applications."
-        ],
-        "typical_challenges": [
-          "Managing noisy text data.",
-          "Semantic understanding challenges: handling sarcasm, negation, or contextual subtleties in sentiment analysis.",
-          "Sequence modeling challenges and capturing long-range dependencies (addressed by transformers).",
-          "Data scarcity and generalization (addressed by transfer learning and domain adaptation)."
-        ]
-      }
-    },
-    {
-      "skill": "Computer Vision",
-      "extracted_content": {
-        "core_concepts": [
-          "Convolutional Neural Networks (CNNs)",
-          "Feature extraction (Sobel/Canny edge detectors, HOG, SIFT/SURF)",
-          "Transfer learning (VGG, ResNet, Inception)",
-          "Image preprocessing (resizing, normalization, grayscale conversion, noise reduction, filtering, binarization, thresholding, histogram equalization, gamma correction)",
-          "Color spaces (RGB, CMYK, YCbCr)",
-          "Pixels and image resolution",
-          "Supervised and unsupervised learning"
-        ],
-        "problem_solving": [
-          "Overfitting mitigation (data augmentation, dropout layers, early stopping, L1/L2 regularization, batch normalization, simplifying model architecture)",
-          "Imbalanced datasets (collecting more data, oversampling, undersampling, adjusting training processes, focal loss)",
-          "Limited computational resources (lightweight neural network architectures like MobileNet, SqueezeNet, ShuffleNet; model compression, pruning, quantization; TensorFlow Lite, NVIDIA TensorRT)",
-          "Varying lighting conditions (histogram equalization, data augmentation, HSV color space, grayscale conversion)",
-          "Occlusion (robust feature descriptors, multi-scale detection, ensemble techniques, Kalman filters)",
-          "Designing systems for automated content moderation or real-time quality control (data pipelines, model selection like YOLO, continuous performance evaluation)"
-        ],
-        "key_terminology": [
-          "Object Detection (R-CNN, YOLO, SSD)",
-          "Object Recognition/Classification",
-          "Semantic Segmentation",
-          "Instance Segmentation",
-          "Non-Maximum Suppression (NMS)",
-          "3D Reconstruction",
-          "Optical Flow",
-          "Generative Adversarial Networks (GANs)",
-          "Evaluation Metrics (Accuracy, Intersection over Union (IoU), Mean Average Precision (mAP))"
-        ],
-        "best_practices": [
-          "Ethical considerations (anonymization, data consent, bias detection, societal impact)",
-          "Project management and adaptability (lessons learned, continuous learning)",
-          "System optimization (deployment challenges, model quantization, pruning, TensorFlow Lite, NVIDIA TensorRT)",
-          "Trade-offs (optimization algorithms, model architectures, data processing techniques vs. accuracy, computational cost, speed)",
-          "Evaluation and testing (diverse datasets, auditing for bias, comprehensive metrics)"
-        ],
-        "typical_challenges": [
-          "Data challenges (sourcing high-quality data, annotation costs, imbalanced data; solutions: active learning, semi-supervised learning, data augmentation, sampling)",
-          "Environmental variability (lighting, viewpoint, scale, occlusions; solutions: data augmentation, invariant feature descriptors, multi-scale detection, advanced tracking algorithms)",
-          "Computational constraints (training/deploying complex models, real-time applications, edge devices; solutions: efficient network architectures, model compression, hardware acceleration)",
-          "Model robustness and generalization (overfitting, performance on unseen data; solutions: regularization, early stopping, diverse data augmentation)",
-          "Bias and fairness (across demographics/conditions; solutions: careful dataset curation, bias detection tools, mitigation strategies)"
+        "challenges": [
+          "Query Performance Tuning: Optimizing slow queries, especially on large datasets.",
+          "Deadlocks: When two or more transactions are waiting for each other to release locks.",
+          "Race Conditions: Multiple transactions trying to update the same data simultaneously.",
+          "Data Consistency Across Distributed Systems: Ensuring data integrity in highly scalable, distributed database environments.",
+          "Security Vulnerabilities: SQL Injection attacks and managing user permissions effectively.",
+          "Schema Evolution: Managing changes to database schemas in production environments without downtime.",
+          "Data Governance: Establishing policies and procedures for data usage, security, and quality.",
+          "Scaling Database Architectures: Deciding between vertical scaling, horizontal scaling (sharding), or adopting NoSQL solutions.",
+          "Disaster Recovery: Implementing robust backup and recovery plans to minimize data loss and downtime.",
+          "Integration with Other Systems: Connecting SQL databases with application layers, reporting tools, and other data sources.",
+          "Improper Use of `GROUP BY`: Leading to incorrect aggregation or unexpected results.",
+          "Suboptimal Indexing: Over-indexing can hurt write performance, under-indexing can hurt read performance.",
+          "Lack of Transaction Management: Not using `BEGIN TRANSACTION`, `COMMIT`, `ROLLBACK` for critical operations.",
+          "Data Type Mismatches: Causing implicit conversions, performance issues, or errors.",
+          "Managing Database Size: Planning for growth and ensuring efficient storage utilization."
         ]
       }
     }

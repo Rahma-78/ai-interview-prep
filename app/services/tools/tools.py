@@ -7,6 +7,7 @@ These tools are responsible for file processing, discovering interview sources, 
 import json
 import logging
 from pathlib import Path
+from typing import List, Dict
 
 # Third-Party Imports
 from langchain_community.document_loaders import PyPDFLoader
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 # --- CrewAI Tools ---
+
 
 @tool
 def file_text_extractor(file_path: str) -> str:
@@ -72,13 +74,13 @@ def file_text_extractor(file_path: str) -> str:
 
 
 @tool
-async def grounded_source_discoverer(search_query: str) -> AllSkillSources:
+async def grounded_source_discoverer(skills: List[str]) -> List[Dict]:
     """
-    Asynchronously retrieves Gemini's native search response for a given skill.
-    This function returns the raw Gemini response text along with the skill,
+    Asynchronously retrieves Gemini's native search response for a list of skills.
+    This function returns the raw Gemini response text for each skill,
     providing context for question generation by the third agent.
     """
-    return await discover_sources(search_query)
+    return await discover_sources(skills)
 
 
 @tool
