@@ -29,23 +29,27 @@ class InterviewPrepAgents:
         Defines the agent responsible for analyzing resumes and extracting technical skills.
         """
         return Agent( 
-            role="Senior Technical Recruiter",
-            goal="Analyze the content of a provided resume to identify the top 10 most relevant technical skills that are best suited for generating deep, conceptual verbal interview questions.",
+            role="Technical Skills Intelligence Analyst",
+            goal=(
+                "Extract exactly 10 high-impact technical skills from the resume. "
+                "Focus on core competencies suitable for conceptual interview questions."
+            ),
             backstory=(
-                "You are an elite technical recruiter with over a decade of experience. "
-                "You have a masterful ability to scan any resume and extract the most relevant technical skills, "
-                "ignoring fluff and focusing on what matters for a technical role."
+                "You are an elite technical skills analyst "
+                "Your specialty is identifying skills that reveal a candidate's conceptual understanding, not just tool familiarity. "
+                "You distinguish between surface-level buzzwords and genuine technical competencies by analyzing: "
+                "You prioritize skills that can be explored through architecture discussions, design trade-offs, "
+                "and problem-solving scenarios rather than syntax or coding exercises. "
             ),
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
             verbose=False,  # Reduce verbose output to improve performance
             allow_delegation=False,
-            max_iter=3,  # Limit iterations to reduce latency
-            max_rpm=30,  # Increase requests per minute for faster processing
+            max_iter=settings.AGENT_MAX_ITER,  # Limit iterations to reduce latency
+            max_rpm=settings.AGENT_MAX_RPM,  # Increase requests per minute for faster processing
             memory=False,  # Disable memory to reduce overhead
             cache=False,  # Disable caching for faster first call
-            response_format=ExtractedSkills,  # Force JSON response for faster parsing
-            async_execution=True  # Enable async execution for better performance
+            response_format=ExtractedSkills, # Enforce output format
          )
 
     def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:
@@ -66,10 +70,9 @@ class InterviewPrepAgents:
             tools=[tools["grounded_source_discoverer"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            max_iter=3,
-            max_rpm=30,
+            max_iter=settings.AGENT_MAX_ITER,
+            max_rpm=settings.AGENT_MAX_RPM,
             cache=False,
-            async_execution=True,  # Enable async execution for better performance
             response_format=AllSkillSources  # Enforce output format
         )
 

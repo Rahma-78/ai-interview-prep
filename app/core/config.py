@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     QUESTION_GENERATION_TIMEOUT: int = 120
     MAX_RETRIES: int = 2
     
+    # Agent Configuration
+    AGENT_MAX_ITER: int = 3
+    AGENT_MAX_RPM: int = 10
+    
+    # Service Specific Limits
+    GEMINI_RPM: int = 10
+    
 
 # Initialize settings and validate API keys
 settings = Settings()

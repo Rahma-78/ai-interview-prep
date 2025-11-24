@@ -4,94 +4,366 @@
       "skill": "Python",
       "extracted_content": {
         "core_concepts": [
-          "Data Types and Structures: numeric types (integers, floats, complex, booleans), text types (strings), sequence types (lists, tuples, ranges). Differentiate between mutable (lists, sets, dictionaries) and immutable (tuples, strings, numbers) data types. Dictionaries (key-value pairs) and sets (unordered unique elements).",
-          "Object-Oriented Programming (OOP): classes, objects, attributes, methods, inheritance, encapsulation, polymorphism. Usage of `__init__()` method.",
-          "Memory Management and Concurrency: Global Interpreter Lock (GIL) and its impact on multi-threading performance, general memory management.",
-          "Functions and Scopes: local vs. global scope, argument passing (by reference), functions vs. methods. `*args` and `**kwargs`.",
-          "Control Flow: `for` and `while` loops, conditional statements.",
-          "Error Handling: `try-except` blocks for exceptions."
+          "Python's memory management (garbage collection, reference counting, memory pools, private heaps)",
+          "Global Interpreter Lock (GIL) and its implications for multithreaded programs (CPU-bound tasks)",
+          "Mutable (e.g., lists) vs. immutable (e.g., tuples) data types",
+          "Shallow vs. deep copies",
+          "Object-Oriented Programming (OOP) principles (inheritance, classes, objects)",
+          "Functions (lambda expressions, decorators, `pass` statement)",
+          "Modules vs. libraries, packages, namespaces",
+          "Python as an interpreted and dynamically typed language",
+          "PEP 8 (style guide for Python code)"
         ],
         "problem_solving": [
-          "Algorithmic Thinking: implementing basic algorithms (reversing a string, palindromes, factorials, Fibonacci, missing numbers, perfect squares).",
-          "Data Manipulation: manipulating lists (removing duplicates, concatenating, common elements), strings (character counting, splitting, joining, replacing), dictionaries (reversing keys/values, merging). List, dictionary, and tuple comprehensions.",
-          "Working with Libraries (e.g., Pandas, NumPy): Pandas Series and DataFrames, indexing, slicing, aggregation, joining, filtering, handling missing values/outliers, performance optimization (vectorized operations).",
-          "Generators and Iterators: `yield` for generator functions, iterators for efficient memory usage with large datasets.",
-          "Lambda Functions: purpose and application of anonymous `lambda` functions."
+          "Efficient data manipulation techniques (list comprehensions)",
+          "Handling missing or corrupted data",
+          "Advantages of NumPy arrays over standard nested lists (performance, memory efficiency, vectorized operations)",
+          "Reading CSV files into Pandas DataFrames",
+          "Calculating correlation matrices for data exploration",
+          "Concurrency (multithreading for I/O-bound tasks, multiprocessing for CPU-bound tasks)"
         ],
         "key_terminology": [
-          "PEP 8: Python Enhancement Proposal 8, style guide.",
-          "GIL (Global Interpreter Lock): mutex protecting Python objects, preventing multiple native threads from executing bytecodes simultaneously.",
-          "Mutable vs. Immutable: whether an object's state can be modified after creation.",
-          "Decorators: functions modifying behavior of other functions/classes.",
-          "Context Managers: objects defining runtime context, used with `with` statement for resource management.",
-          "Pickling and Unpickling: serialization and deserialization of Python objects.",
-          "Docstrings: strings documenting Python modules, functions, classes, methods."
+          "Local and global variables",
+          "Decorators",
+          "Lambda functions",
+          "Deep vs. shallow copies",
+          "Modules vs. libraries",
+          "PEP 8",
+          "Python namespaces",
+          "Global Interpreter Lock (GIL)",
+          "Pickling and unpickling (object serialization)",
+          "Python literals"
         ],
         "best_practices": [
-          "Readability and Pythonic Code: clear, concise, idiomatic Python code (e.g., list comprehensions).",
-          "Performance Optimization: identifying and resolving bottlenecks, avoiding unnecessary loops, optimizing Pandas operations.",
-          "Testing and Debugging: approaches to test code, debug issues, ensure correctness.",
-          "Resource Management: proper use of context managers for file I/O and other resources.",
-          "Modular Design: organizing code into functions, classes, modules, and packages for reusability and maintainability."
+          "Prioritizing readable and simple syntax",
+          "Modular programming (code organization, reusability, maintainability)",
+          "Efficient memory management",
+          "Selection of appropriate data structures (e.g., NumPy for numerical operations)"
         ],
-        "typical_challenges": [
-          "Debugging Code Snippets: identifying and fixing syntax errors, logical flaws, or performance problems in incorrect/inefficient code.",
-          "Algorithm Efficiency: analyzing time and space complexity of algorithms (data structures, sorting/searching).",
-          "Concurrency Issues: working around GIL limitations for CPU-bound tasks (e.g., multiprocessing).",
-          "Real-world Scenarios: practical application of Python for web scraping, API interactions, automation workflows, or specific data science tasks."
+        "common_challenges": [
+          "Managing concurrency effectively (GIL limitations, multiprocessing as a solution for CPU-bound tasks)",
+          "Memory management (understanding garbage collector)",
+          "Processing large datasets efficiently",
+          "Handling data imperfections (using libraries like Pandas and NumPy)"
         ]
       }
     },
     {
-      "skill": "Machine Learning",
+      "skill": "TensorFlow",
+      "extracted_content": {}
+    },
+    {
+      "skill": "PyTorch",
       "extracted_content": {
         "core_concepts": [
-          "Foundational differences between supervised, unsupervised, semi-supervised, and reinforcement learning paradigms and their applicability.",
-          "Model evaluation: bias-variance tradeoff, overfitting-underfitting, and implications for model generalization.",
-          "Ensemble methods: Gradient Boosting Machines (GBM) and Random Forests (operational differences and advantages).",
-          "Deep learning fundamentals: Convolutional Neural Networks (CNNs), activation functions, vanishing and exploding gradients, Batch Normalization vs. Layer Normalization.",
-          "Recurrent Neural Networks (RNNs), Long Short-Term Memory (LSTM) networks, and attention mechanisms for sequence modeling.",
-          "Dimensionality reduction techniques, regularization methods (L1, L2), and kernel functions in Support Vector Machines (SVMs).",
-          "Classic algorithms: K-Nearest Neighbor (KNN), Decision Trees, K-Means, Gaussian Mixture Models, and DBSCAN (underlying mechanics and use cases)."
+          "Tensor: multi-dimensional array, fundamental for data representation and computation. Knowledge of tensor operations, data types, device placement (CPU/GPU), and memory management.",
+          "Autograd engine: PyTorch's automatic differentiation system. Understanding how gradients are computed, the computational graph (dynamic nature), `requires_grad`, `grad_fn`, and disabling gradient computation.",
+          "`torch.nn` module: Central to defining neural networks. Encompasses `nn.Module` (custom layer/model creation), `nn.functional` (stateless functional operations), and pre-built layers (`Linear`, `Conv2d`, `BatchNorm`).",
+          "`torch.optim` module: Covers various optimization algorithms (SGD, Adam, RMSprop) and learning rate schedulers.",
+          "`torch.utils.data.Dataset` and `torch.utils.data.DataLoader`: Essential for data handling, creating custom datasets, efficient loading/batching, and data transformations/augmentations.",
+          "Dynamic computation graph: Provides flexibility for control flow and debugging."
         ],
         "problem_solving": [
-          "Strategies for choosing the appropriate algorithm for a given dataset.",
-          "Handling imbalanced labels in classification models.",
-          "Methods for dealing with large datasets that do not fit into memory.",
-          "Avoiding overfitting through cross-validation, regularization, model simplification, and data augmentation.",
-          "Implementing core machine learning algorithms from scratch (e.g., AUC, K-Means, Gradient Descent) using NumPy.",
-          "Improving model training speed.",
-          "Generating prediction intervals.",
-          "Designing and interpreting A/B tests for machine learning models in production.",
-          "Building propensity score models.",
-          "Fraud detection without labels.",
-          "Identifying meaningful customer segmentation."
+          "Constructing complete deep learning workflows: Understanding typical training loop structure (forward/backward passes, optimizer steps, loss calculation).",
+          "Transfer learning: Loading pre-trained models, freezing layers, and fine-tuning specific parts of the network.",
+          "Batch normalization: Stabilizing and accelerating training.",
+          "Advanced architectures: Transformers and attention mechanisms (multi-head self-attention, positional encodings).",
+          "Handling imbalanced datasets: Using class weights with loss functions (e.g., `CrossEntropyLoss`).",
+          "Debugging complex models: Systematic approaches to isolate issues (hooks, visualizing activations/gradients, simplifying models).",
+          "Optimizing training for large datasets/models: Distributed training (DDP), gradient accumulation, mixed-precision training, efficient data loading.",
+          "Handling variable-length sequences: Custom `DataLoader`s with padding and masking strategies.",
+          "Implementing custom operations: Designing and implementing custom `autograd` functions.",
+          "Overfitting: Regularization techniques (dropout, L1/L2), early stopping, data augmentation."
         ],
         "key_terminology": [
-          "Bias, variance, overfitting, underfitting, and their interrelationship.",
-          "Supervised, unsupervised, and semi-supervised learning.",
-          "Cost function, curse of dimensionality, regularization.",
-          "Model evaluation metrics: Accuracy, Precision, Recall, F1-score, Confusion Matrix, ROC Curve, AUC (applications and tradeoffs).",
-          "Deep learning terms: activation functions, vanishing/exploding gradients, batch normalization, layer normalization, dropout, attention mechanisms, transfer learning.",
-          "MLOps terminology: model drift, shadow deployments, model serving, batch prediction, model registry, model versioning, feature stores, pipeline orchestration."
+          "Tensor",
+          "Autograd",
+          "`torch.nn` module",
+          "`nn.Module`",
+          "`nn.functional`",
+          "`torch.optim` module",
+          "`torch.utils.data.Dataset`",
+          "`torch.utils.data.DataLoader`",
+          "Dynamic computation graph",
+          "Transfer learning",
+          "Batch normalization",
+          "Transformer",
+          "Attention",
+          "Hooks: Mechanisms to inject custom code into forward/backward pass for debugging, visualization, or gradient modification.",
+          "DistributedDataParallel (`DDP`): Primary tool for multi-GPU/multi-node distributed training.",
+          "TorchServe: Tool for deploying PyTorch models in production.",
+          "Gradient Clipping: Technique to prevent exploding gradients.",
+          "Mixed Precision Training: Using 16-bit and 32-bit floating-point types to reduce memory and speed up computation."
         ],
         "best_practices": [
-          "Implementing effective cross-validation techniques.",
-          "Understanding various learning rate scheduling strategies.",
-          "Knowing when and how to apply early stopping to prevent overfitting.",
-          "Strategic use of ensemble methods to improve model performance.",
-          "Challenges and techniques of feature engineering (automated tools, domain-driven feature creation, feature selection methods).",
-          "Model governance, compliance, and ensuring model fairness while handling bias in ML systems.",
-          "Distinction between concept drift and data drift and how to address them in production."
+          "Performance optimization: On GPUs, `torch.cuda` functionalities, device management, efficient tensor operations.",
+          "Implementing custom modules, layers, and activation functions using `nn.Module`.",
+          "Effective debugging of neural networks: Identifying common issues (non-converging models, exploding/vanishing gradients).",
+          "Memory profiling: Identifying and resolving memory bottlenecks.",
+          "Model saving and loading (`torch.save`, `torch.load`), model versioning, CI/CD strategies.",
+          "Reproducible experiments and consistent environments."
+        ],
+        "typical_challenges": [
+          "Debugging complex models",
+          "Optimizing training for large datasets/models",
+          "Handling variable-length sequences",
+          "Implementing custom operations",
+          "Overfitting"
+        ]
+      }
+    },
+    {
+      "skill": "Scikit-learn",
+      "extracted_content": {}
+    },
+    {
+      "skill": "FastAPI",
+      "extracted_content": {
+        "core_concepts": [
+          "FastAPI is built upon Starlette for web parts and Pydantic for data parts, ensuring high performance and automatic validation.",
+          "Key components include the FastAPI application instance, which serves as the entry point, and endpoints defined by path operations that handle specific HTTP methods (GET, POST, PUT, DELETE, etc.).",
+          "Asynchronous programming is a fundamental aspect, enabling FastAPI to handle multiple concurrent requests efficiently using ASGI (Asynchronous Server Gateway Interface) and non-blocking I/O operations.",
+          "Python's type hints are extensively used for automatic request validation, response serialization, and documentation generation.",
+          "Pydantic models are central to data validation and serialization, defining the structure and constraints of incoming and outgoing data, and automatically generating OpenAPI (Swagger UI) and ReDoc documentation.",
+          "Dependency Injection (DI) allows for organized, reusable, and testable code by providing external dependencies (like database connections or authentication logic) to endpoint functions.",
+          "Path parameters capture dynamic segments of a URL (e.g., `/items/{item_id}`).",
+          "Query parameters are used for filtering or optional data (e.g., `/users?active=true`).",
+          "Request bodies, typically defined using Pydantic models, handle structured data sent with requests.",
+          "Response models define the structure of data returned to the client."
+        ],
+        "problem_solving": [
+          "Dependency Injection: Used to manage shared resources and services, abstract business logic, and enforce authentication/authorization across multiple endpoints.",
+          "Middleware: Intercepts requests and responses, allowing for cross-cutting concerns like logging, adding custom headers, authentication, authorization, and Gzip compression.",
+          "Background Tasks: Facilitate performing operations after sending a response to the client, such as sending emails, processing uploaded files, or updating caches, without blocking the main thread.",
+          "Error Handling: FastAPI provides mechanisms to handle validation errors gracefully and raise custom `HTTPException` instances with specific status codes and messages.",
+          "Testing: FastAPI applications can be easily tested using `pytest` and `TestClient` to simulate API requests, allowing for unit, integration, and end-to-end testing."
+        ],
+        "key_terminology": [
+          "ASGI (Asynchronous Server Gateway Interface): A specification for Python web servers and applications to communicate asynchronously.",
+          "Starlette: The lightweight ASGI framework that FastAPI is built upon.",
+          "Pydantic: A data validation and settings management library that FastAPI uses for data validation, serialization, and automatic documentation.",
+          "OpenAPI (Swagger UI/ReDoc): Industry standards for defining REST APIs. FastAPI automatically generates interactive API documentation.",
+          "Path Parameters: Variables embedded directly in the URL path, used to identify specific resources.",
+          "Query Parameters: Optional key-value pairs appended to the URL after a question mark, used for filtering or pagination.",
+          "Request Body: The data sent by the client in the body of an HTTP request, typically JSON, validated by Pydantic models.",
+          "Response Model: A Pydantic model used to define and serialize the structure of the data returned by an API endpoint."
+        ],
+        "best_practices": [
+          "RESTful API Design: Adhering to RESTful principles, including proper resource naming, appropriate HTTP status codes, and clear error handling.",
+          "Security: Implement robust security measures such as OAuth2 with Password (and hashing), JWT tokens, API key authentication, and addressing Cross-Origin Resource Sharing (CORS). Input validation is critical.",
+          "Testing Strategy: Comprehensive testing (unit, integration, end-to-end) using tools like `pytest`.",
+          "Performance Optimization: Leveraging asynchronous endpoints for I/O-bound tasks, implementing caching (e.g., with Redis), using Gunicorn with Uvicorn workers, enabling database connection pooling, and optimizing database queries.",
+          "Scalability: Designing for scalability involves asynchronous request handling, effective use of dependency injection, and implementing background tasks.",
+          "API Versioning: Employing versioning strategies (e.g., `/v1/users`) ensures backward compatibility."
         ],
         "challenges_and_solutions": [
-          "Poor data quality or insufficient data quantity (leading to underfitting or inaccurate models).",
-          "Overfitting (solutions: regularization, cross-validation, simplifying model architecture).",
-          "Managing the bias-variance tradeoff.",
-          "Interpretability of complex models (especially deep learning).",
-          "Ensuring scalability for large datasets and real-time predictions.",
-          "Addressing ethical concerns, such as bias in AI models and ensuring fairness.",
-          "Monitoring and mitigating model drift and concept drift in production environments."
+          "Data Validation Failures: FastAPI, with Pydantic, automatically validates data against defined models and provides clear, detailed error messages.",
+          "Managing Asynchronous Operations: Proper management of `async`/`await` keywords and understanding Python's event loop are essential to avoid complexities like race conditions.",
+          "Dependency Management in Complex Applications: FastAPI's `Depends` function streamlines this by automatically handling the lifecycle and scope of dependencies.",
+          "Securing Endpoints: FastAPI offers built-in tools like `OAuth2PasswordBearer` and robust support for JWT.",
+          "Performance Bottlenecks: Identifying and resolving performance issues often involves profiling I/O-bound operations, leveraging FastAPI's asynchronous nature, implementing caching, and optimizing database interactions.",
+          "CORS Issues: FastAPI provides `CORSMiddleware` to easily define allowed origins, methods, and headers.",
+          "Handling Large File Uploads: FastAPI can handle `UploadFile` objects, allowing processing in chunks to optimize memory usage, potentially combined with `StreamingResponse`."
+        ]
+      }
+    },
+    {
+      "skill": "Docker",
+      "extracted_content": {
+        "core_concepts": [
+          "Docker is an open-source platform that automates the deployment, scaling, and management of applications within lightweight, isolated environments called containers.",
+          "It addresses the \"it works on my machine\" problem by ensuring consistency across development, testing, and production environments.",
+          "Docker operates on a client-server architecture. The Docker client interacts with the Docker daemon (dockerd), which manages Docker objects such as images, containers, networks, and volumes.",
+          "A Docker Image is a read-only template containing the application code, runtime, libraries, dependencies, and configuration needed to run an application.",
+          "Images are built from a Dockerfile, a text file with instructions for assembling the image.",
+          "Each instruction in a Dockerfile creates an immutable, read-only layer, which Docker caches and shares between images, enhancing efficiency and reducing storage.",
+          "A Docker Container is a runnable instance of an image, isolated from the host and other containers, providing a consistent environment.",
+          "Unlike virtual machines (VMs) which virtualize hardware and run a full guest OS, containers share the host OS kernel, making them significantly lighter, faster to start, and more resource-efficient.",
+          "Dockerfile Instructions: `FROM` (base image), `RUN` (executes commands during build), `COPY` (copies files), `ADD` (similar to `COPY`, handles URLs/tar), `CMD` (default arguments for container), `ENTRYPOINT` (configures container as executable), `EXPOSE` (informs Docker of listening ports).",
+          "Docker Compose: A tool for defining and running multi-container Docker applications using a single YAML file (`docker-compose.yml`).",
+          "Docker Swarm: Docker's native container orchestration tool for managing a cluster of Docker engines.",
+          "Docker Volumes: Preferred mechanism for persisting data generated by and used by Docker containers, stored on the host filesystem.",
+          "Docker Networks: Bridge Network (default for single host), Overlay Network (for multi-host/Swarm clusters).",
+          "Namespaces: Linux kernel features for isolation (PID, NET, MNT) for each container.",
+          "cgroups (Control Groups): Linux kernel features that limit and isolate resource usage (CPU, memory, disk I/O) for containers.",
+          "BuildKit: Docker feature enhancing build performance, parallel execution, advanced caching, and multi-stage builds."
+        ],
+        "problem_solving": [
+          "Debugging: Inspect container logs (`docker logs <container_id>`), use `docker inspect` for detailed info, run commands inside containers (`docker exec -it <container_id> /bin/bash`). For build failures, use `--progress=plain` and `--no-cache`.",
+          "Scaling Applications: `docker service scale <servicename>=<replicacount>` in Docker Swarm; Docker Compose adjusts replica counts for multi-container apps.",
+          "Data Persistence: Volumes are the standard solution; bind mounts for direct host path mapping (useful for development).",
+          "Inter-Container Communication: User-defined bridge networks for same-host communication by name; overlay networks in Docker Swarm for multi-host communication via internal DNS service.",
+          "Image Size: Addressed by multi-stage builds, smaller base images, combining `RUN` commands, and cleaning up temporary files.",
+          "Data Persistence: Solved by using Docker volumes.",
+          "Inter-Container Communication: Managed via Docker's networking features (bridge and overlay networks).",
+          "Container Restarts/Crashes: Debug by checking logs (`docker logs`), inspecting exit codes, and implementing health checks in Dockerfiles.",
+          "Resource Management: Limit CPU and memory usage using `cgroups` through Docker's `--cpus` and `--memory` flags.",
+          "Managing Multiple Environments: Utilize separate Docker Compose files for different environments (dev, test, prod) and leverage environment variables or `.env` files."
+        ],
+        "best_practices": [
+          "Image Optimization: Multi-stage builds, lightweight base images (e.g., Alpine), combine `RUN` commands, clean up temporary files, use `.dockerignore`.",
+          "Security: Run as non-root user, use trusted images, regularly scan for vulnerabilities (Clair, Trivy, Anchore), set resource limits (`--cpus`, `--memory`), use network isolation, utilize Docker Secrets or external secret management tools.",
+          "Container Lifecycle Management: Understand `docker create`, `docker start`, `docker stop`, `docker restart`, `docker pause`, `docker unpause`, `docker rm`. Configure restart policies (e.g., `always`, `on-failure`).",
+          "Consistent images should be used across all environments."
+        ],
+        "typical_challenges": [
+          "Image Size",
+          "Data Persistence",
+          "Inter-Container Communication",
+          "Container Restarts/Crashes",
+          "Resource Management",
+          "Managing Multiple Environments"
+        ]
+      }
+    },
+    {
+      "skill": "SQL",
+      "extracted_content": {
+        "core_concepts": [
+          "SQL vs. NoSQL databases (structured nature, fixed schema, ACID properties)",
+          "Data integrity (NOT NULL, UNIQUE, PRIMARY KEY, FOREIGN KEY, CHECK constraints)",
+          "Database normalization (1NF, 2NF, 3NF, BCNF) and denormalization",
+          "Database objects (views, stored procedures, triggers, user-defined functions)",
+          "Indexing strategies (clustered, non-clustered, impact on performance)",
+          "Transaction isolation levels (Read Uncommitted, Read Committed, Repeatable Read, Serializable)",
+          "Referential integrity",
+          "Concurrency control mechanisms",
+          "Deadlocks (detection and resolution)",
+          "Execution plan",
+          "Query optimizer",
+          "Database schema and catalog",
+          "Dynamic SQL (advantages and risks like SQL injection)"
+        ],
+        "problem_solving": [
+          "Manipulating and retrieving complex data",
+          "JOIN types (INNER, LEFT, RIGHT, FULL OUTER) and decision-making between JOINs and subqueries",
+          "Window functions (ROW_NUMBER(), RANK(), DENSE_RANK(), NTILE(), LAG(), LEAD())",
+          "Common Table Expressions (CTEs) for complex and recursive queries",
+          "Set operations (UNION, UNION ALL, INTERSECT, EXCEPT)",
+          "Handling NULL values (IS NULL, COALESCE)",
+          "Date/time functions",
+          "String manipulations",
+          "Pivoting and unpivoting data (using CASE statements)",
+          "Diagnosing and resolving performance bottlenecks (interpreting execution plans, identifying missing/inefficient indexes, optimizing subqueries/joins, rewriting SQL)",
+          "Managing concurrency issues and deadlocks (understanding isolation levels, error handling, retry logic)",
+          "Dealing with missing or inconsistent data (NULL handling, data validation, cleansing)",
+          "Solving problems with complex hierarchical data structures (recursive CTEs)"
+        ],
+        "best_practices": [
+          "Query optimization (analyzing execution plans, avoiding SELECT *, applying WHERE clauses early, selecting appropriate JOIN types, strategic indexing)",
+          "Regularly updating database statistics",
+          "Database security (preventing SQL injection via parameterized queries/stored procedures, role-based access control, principle of least privilege)",
+          "Designing for data integrity",
+          "Choosing appropriate data types for storage and performance"
+        ],
+        "challenges_and_solutions": [
+          "Diagnosing and resolving performance bottlenecks",
+          "Managing concurrency issues and deadlocks",
+          "Dealing with missing or inconsistent data",
+          "Scalability concerns (optimized SQL queries, efficient database design)",
+          "Solving problems with complex hierarchical data structures using recursive CTEs"
+        ]
+      }
+    },
+    {
+      "skill": "OpenCV",
+      "extracted_content": {}
+    },
+    {
+      "skill": "Natural Language Processing (NLP)",
+      "extracted_content": {
+        "core_concepts": [
+          "Tokenization techniques (word, character, subword like Byte-Pair Encoding), including handling whitespace and punctuation.",
+          "Word embeddings (e.g., Word2Vec, GloVe) and how they capture semantic meaning and relationships.",
+          "N-grams and their role in preserving context and word order, as well as syntactic and semantic features.",
+          "Stemming and lemmatization and their impact on text normalization.",
+          "TF-IDF (Term Frequency-Inverse Document Frequency): A statistical measure reflecting a word's importance in a document relative to a corpus.",
+          "Bag-of-Words (BoW): A text representation model that ignores grammar and word order but keeps multiplicity.",
+          "Co-reference Resolution: Identifying expressions in text that refer to the same entity.",
+          "Lexical Analysis: Converting character sequences into token sequences for word identification and classification.",
+          "Part-of-Speech (POS) Tagging: Assigning grammatical categories to words.",
+          "Named Entity Recognition (NER): Identifying and classifying entities like people, organizations, locations.",
+          "Attention Mechanisms: Crucial components in transformer models, allowing the model to focus on relevant parts of the input sequence."
+        ],
+        "problem_solving": [
+          "Preprocessing pipeline: cleaning noisy text data (normalization, misspelling removal, filtering non-textual elements like HTML tags) and preparing data for model input.",
+          "Common NLP tasks: text classification (e.g., spam detection, sentiment analysis), machine translation, question answering, summarization, and topic modeling.",
+          "Various modeling approaches: traditional machine learning techniques (e.g., logistic regression for sentiment analysis) to deep learning architectures.",
+          "Latent Semantic Indexing (LSI) for discovering hidden relationships between words.",
+          "Managing noisy text data effectively through preprocessing techniques.",
+          "Handling sarcasm, negation, or contextual subtleties in sentiment analysis.",
+          "Evolution from Recurrent Neural Networks (RNNs), LSTMs, and GRUs to transformer architectures (BERT, GPT) for addressing sequence modeling challenges and capturing long-range dependencies.",
+          "Transfer learning and domain adaptation for NLP models to address challenges in data scarcity and generalization."
+        ],
+        "key_terminology": [
+          "Tokenization",
+          "Word Embeddings",
+          "TF-IDF (Term Frequency-Inverse Document Frequency)",
+          "Bag-of-Words (BoW)",
+          "Co-reference Resolution",
+          "Lexical Analysis",
+          "Part-of-Speech (POS) Tagging",
+          "Named Entity Recognition (NER)",
+          "Attention Mechanisms"
+        ],
+        "best_practices": [
+          "Strategies for handling out-of-vocabulary (OOV) words in NLP models.",
+          "Choosing appropriate evaluation metrics for different NLP tasks (e.g., precision, recall, F1-score for classification; BLEU score for machine translation) and explaining their mathematical formulations.",
+          "Optimizing models, handling complex data challenges, and the trade-offs involved in deploying NLP solutions.",
+          "Familiarity with essential NLP libraries like NLTK, spaCy, and Hugging Face Transformers, and their practical applications."
+        ],
+        "typical_challenges": [
+          "Managing noisy text data.",
+          "Semantic understanding challenges: handling sarcasm, negation, or contextual subtleties in sentiment analysis.",
+          "Sequence modeling challenges and capturing long-range dependencies (addressed by transformers).",
+          "Data scarcity and generalization (addressed by transfer learning and domain adaptation)."
+        ]
+      }
+    },
+    {
+      "skill": "Computer Vision",
+      "extracted_content": {
+        "core_concepts": [
+          "Convolutional Neural Networks (CNNs)",
+          "Feature extraction (Sobel/Canny edge detectors, HOG, SIFT/SURF)",
+          "Transfer learning (VGG, ResNet, Inception)",
+          "Image preprocessing (resizing, normalization, grayscale conversion, noise reduction, filtering, binarization, thresholding, histogram equalization, gamma correction)",
+          "Color spaces (RGB, CMYK, YCbCr)",
+          "Pixels and image resolution",
+          "Supervised and unsupervised learning"
+        ],
+        "problem_solving": [
+          "Overfitting mitigation (data augmentation, dropout layers, early stopping, L1/L2 regularization, batch normalization, simplifying model architecture)",
+          "Imbalanced datasets (collecting more data, oversampling, undersampling, adjusting training processes, focal loss)",
+          "Limited computational resources (lightweight neural network architectures like MobileNet, SqueezeNet, ShuffleNet; model compression, pruning, quantization; TensorFlow Lite, NVIDIA TensorRT)",
+          "Varying lighting conditions (histogram equalization, data augmentation, HSV color space, grayscale conversion)",
+          "Occlusion (robust feature descriptors, multi-scale detection, ensemble techniques, Kalman filters)",
+          "Designing systems for automated content moderation or real-time quality control (data pipelines, model selection like YOLO, continuous performance evaluation)"
+        ],
+        "key_terminology": [
+          "Object Detection (R-CNN, YOLO, SSD)",
+          "Object Recognition/Classification",
+          "Semantic Segmentation",
+          "Instance Segmentation",
+          "Non-Maximum Suppression (NMS)",
+          "3D Reconstruction",
+          "Optical Flow",
+          "Generative Adversarial Networks (GANs)",
+          "Evaluation Metrics (Accuracy, Intersection over Union (IoU), Mean Average Precision (mAP))"
+        ],
+        "best_practices": [
+          "Ethical considerations (anonymization, data consent, bias detection, societal impact)",
+          "Project management and adaptability (lessons learned, continuous learning)",
+          "System optimization (deployment challenges, model quantization, pruning, TensorFlow Lite, NVIDIA TensorRT)",
+          "Trade-offs (optimization algorithms, model architectures, data processing techniques vs. accuracy, computational cost, speed)",
+          "Evaluation and testing (diverse datasets, auditing for bias, comprehensive metrics)"
+        ],
+        "typical_challenges": [
+          "Data challenges (sourcing high-quality data, annotation costs, imbalanced data; solutions: active learning, semi-supervised learning, data augmentation, sampling)",
+          "Environmental variability (lighting, viewpoint, scale, occlusions; solutions: data augmentation, invariant feature descriptors, multi-scale detection, advanced tracking algorithms)",
+          "Computational constraints (training/deploying complex models, real-time applications, edge devices; solutions: efficient network architectures, model compression, hardware acceleration)",
+          "Model robustness and generalization (overfitting, performance on unseen data; solutions: regularization, early stopping, diverse data augmentation)",
+          "Bias and fairness (across demographics/conditions; solutions: careful dataset curation, bias detection tools, mitigation strategies)"
         ]
       }
     }

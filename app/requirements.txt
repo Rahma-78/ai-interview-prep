@@ -16,7 +16,7 @@ langchain-google-genai
 langchain-openrouter
 httpx
 
-PyPDF2
+pypdf
 
 
 google-generativeai

@@ -24,14 +24,15 @@ class InterviewPrepTasks:
         """
         return Task(  # type: ignore
             description=(
-        f"Use the file text extractor tool to read the resume at '{file_path}'. "
-        f"From the content, extract the 10 most significant technical skills. "
-        f"ignoring fluff and focusing on what matters for a technical role."
-        f"Focus strictly on foundational concepts, and identify only core competencies."
-    ),
+            f"Use the file text extractor tool to read the resume at '{file_path}'. "
+            f"Analyze the content deeply to extract exactly 10 technical skills that meet these criteria:\n"
+            f"1. Represent core technical competencies, not just tools or frameworks\n"
+            f"2. Are suitable for conceptual interview questions about principles, architecture, and design\n"
+            f"3. Prioritize  specific technologies, methodologies, or domains\n"
+            f"4. Avoid generic soft skills\n"
+            ),
             agent=agent,
             expected_output="JSON object with 'skills' key containing 10 specific, technical skill strings relevant to the candidate's background.",
-            output_json=ExtractedSkills, # Enforce output format
             output_file="app/tests/extracted_skills.json" # Save output to file in the tests directory
         )
 

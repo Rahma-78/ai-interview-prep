@@ -55,7 +55,9 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
         agent_1 = agents.resume_analyzer_agent(tools_dict)
         
         tasks = InterviewPrepTasks()
-        skills_task = tasks.extract_skills_task(agent_1, resume_file_path)
+        # Convert path to forward slashes to prevent LLM from stripping backslashes in tool calls
+        safe_resume_path = resume_file_path.replace('\\', '/')
+        skills_task = tasks.extract_skills_task(agent_1, safe_resume_path)
         
         mini_crew = CrewAI (  
             agents=[agent_1],
@@ -136,7 +138,8 @@ async def test_agent_1_resume_analyzer(resume_file_path: str):
 
 
 if __name__ == "__main__":
-    sample_resume_path = str(Path(__file__).parent.parent / "Rahma Ashraf AlShafi'i.pdf")
+    # Use absolute path to ensure file is found regardless of execution location
+    sample_resume_path = str((Path(__file__).parent.parent / "Rahma Ashraf AlShafi'i.pdf").resolve())
     
     if not os.path.exists(sample_resume_path):
         logging.error(f"Error: Resume file not found at {sample_resume_path}")

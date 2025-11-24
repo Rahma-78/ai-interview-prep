@@ -21,15 +21,18 @@ def get_llm(model: str, api_key: str, temperature: float = 0.1, **kwargs):
 # Gemini Flash - For source discovery agent orchestration (Agent 2)
 llm_gemini = get_llm(
     "gemini/gemini-2.5-flash",
-    temperature=0.1,
+    temperature=0.2,
     api_key=settings.GEMINI_API_KEY
 )
 
 # Groq Llama - For skill extraction (Agent 1)
+# Using llama-3.3-70b-versatile for better function calling support
+# Let CrewAI manage tool_choice automatically
 llm_groq = get_llm(
-    "groq/openai/gpt-oss-120b",
+    "groq/llama-3.3-70b-versatile",
     temperature=0.2,
-    api_key=settings.GROQ_API_KEY
+    api_key=settings.GROQ_API_KEY,
+    
 )
 
 # DeepSeek via OpenRouter - For question generation (Agent 3)
