@@ -82,7 +82,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
         agents=[source_discoverer],
         tasks=[discover_task],
         process=Process.sequential,
-        verbose=True
+        verbose=False
     )
     
     # Pass the skills as input to the crew, simulating the output of the previous task

@@ -13,7 +13,7 @@ def optimize_search_query(skill: str) -> str:
     """
     skill = skill.strip().lower()
     # Core phrase for direct, relevant results
-    base =  f'"{skill}" "technical verbal" "interview questions" '
+    base =  f'"{skill}" "technical interview questions" '
    
     # Exclude common video platforms and non-technical sites
     exclude = "-youtube -vimeo -tiktok -facebook -twitter -instagram -reddit -quora"

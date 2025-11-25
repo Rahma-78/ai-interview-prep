@@ -30,13 +30,13 @@ class Settings(BaseSettings):
     REQUESTS_PER_MINUTE: int = 10
     
     # Service Specific Limits (Requests Per Minute)
-    GEMINI_RPM: int = 10
+    GEMINI_RPM: int = 15
     OPENROUTER_RPM: int = 20
     GROQ_RPM: int = 30
     
     # Agent Configuration
     AGENT_MAX_ITER: int = 3
-    AGENT_MAX_RPM: int = 10
+    AGENT_MAX_RPM: int = 15
     
     # Retry Configuration
     RETRY_MAX_ATTEMPTS: int = 3

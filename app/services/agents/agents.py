@@ -42,7 +42,7 @@ class InterviewPrepAgents:
             ),
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
-            verbose=False,  # Reduce verbose output to improve performance
+            verbose=settings.DEBUG_MODE,  # Reduce verbose output to improve performance
             allow_delegation=False,
             max_iter=settings.AGENT_MAX_ITER,  # Limit iterations to reduce latency
             max_rpm=settings.AGENT_MAX_RPM,  # Increase requests per minute for faster processing

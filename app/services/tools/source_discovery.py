@@ -20,14 +20,12 @@ from google.api_core.exceptions import (
 from app.schemas.interview import AllSkillSources, SkillSources
 from app.services.tools.llm_config import get_genai_client, GEMINI_MODEL
 from app.services.tools.helpers import optimize_search_query
-from app.services.tools.utils import execute_with_retry, AsyncRateLimiter
+from app.services.tools.utils import safe_api_call
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Create dedicated rate limiter for Gemini search tool only
-# This isolates its quota management from other services
-gemini_search_limiter = AsyncRateLimiter(requests_per_minute=settings.GEMINI_RPM)
+
 
 
 def create_fallback_sources(
@@ -72,6 +70,7 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
             for skill in chunk:
                 try:
                     opt_query = optimize_search_query(skill)
+    
                     skills_with_queries.append(f"- Skill: {skill} -> Query: {opt_query}")
                 except Exception as e:
                     logger.warning(f"Query optimization failed for '{skill}': {e}. Using original.")
@@ -83,7 +82,7 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
             prompt = f"You are an expert technical researcher. Perform a 'Split-Search' for the following skills using the specific queries provided:\n\n{skills_block}\n\n"
             prompt += "For EACH skill in the list, you MUST:\n"
             prompt += "1. Execute the EXACT provided search query for that skill.\n"
-            prompt += "2. Find exactly equivalent number of high-quality technical sources of each skill (minimum 3 sources per skill). THIS IS A HARD REQUIREMENT.\n"
+            prompt += "2. Find exactly equivalent number of technical sources of each skill (minimum 3 sources per skill). THIS IS A HARD REQUIREMENT.\n"
             prompt += "3. Extract dense technical content covering: core concepts, problem-solving, terminology, best practices, and challenges.\n\n"
             
             prompt += "CRITICAL OUTPUT RULES:\n"
@@ -109,15 +108,14 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
             )
 
             # Execute grounded search with retry logic using dedicated rate limiter
-            response = await execute_with_retry(
-                asyncio.to_thread,
-                client.models.generate_content,
-                model=GEMINI_MODEL,
-                contents=prompt,
-                config=config,
-                service_name='gemini',
-                rate_limiter=gemini_search_limiter
-            )
+            response = await safe_api_call(
+                    asyncio.to_thread,
+                    client.models.generate_content,
+                    model=GEMINI_MODEL,
+                    contents=prompt,
+                    config=config,
+                    service='gemini'
+                )
 
             response_text = response.text if response.text else ""
             
