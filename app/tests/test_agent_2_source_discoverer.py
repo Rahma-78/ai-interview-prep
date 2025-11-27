@@ -17,6 +17,7 @@ from app.services.tools.tools import grounded_source_discoverer
 from app.schemas.interview import AllSkillSources
 from app.core.config import settings
 
+
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

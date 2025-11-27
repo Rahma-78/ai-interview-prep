@@ -5,6 +5,7 @@ from .tools import (
     question_generator,
 )
 from .llm_config import llm_gemini, llm_groq, llm_openrouter
+from .helpers import create_fallback_sources, optimize_search_query, parse_batch_response
 
 # Export utilities for rate limiting and retry logic
 from .utils import ServiceRateLimiter, safe_api_call, rate_limiter
@@ -19,4 +20,7 @@ __all__ = [
     "ServiceRateLimiter",
     "safe_api_call",
     "rate_limiter",
+    "create_fallback_sources",
+    "optimize_search_query",
+    "parse_batch_response",
 ]
