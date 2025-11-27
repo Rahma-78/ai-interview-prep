@@ -48,6 +48,7 @@ class InterviewPrepAgents:
             max_rpm=settings.AGENT_MAX_RPM,  # Increase requests per minute for faster processing
             memory=False,  # Disable memory to reduce overhead
             cache=False,  # Disable caching for faster first call
+
          )
 
     def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:
@@ -61,7 +62,6 @@ class InterviewPrepAgents:
                 "You are a world-class digital researcher with access to Gemini\'s native search capabilities. "
                 "Your goal is to provide the best source material for generating interview questions. "
                 "You MUST rely strictly on the output of the 'grounded_source_discoverer' tool. "
-                "The tool returns 'raw_content' text. You MUST parse this text and structure it into the 'extracted_content' schema fields (core_concepts, problem_solving, etc.). "
                 "Do not fabricate sources or hallucinate content. If the tool returns few results, work with what is provided."
             ),
             llm=self.llm_gemini,  # Use Gemini for both agent orchestration and grounded search
@@ -80,8 +80,8 @@ class InterviewPrepAgents:
         """
         return Agent(  # type: ignore
             role='Question Generator',
-            goal='Generate insightful, non-coding interview questions based on provided sources and skills.',
-            backstory='An experienced technical interviewer who can craft challenging and relevant questions from given content.',
+            goal='Generate insightful, non-coding interview questions using provided sources as a knowledge base combined with expert technical knowledge.',
+            backstory='An experienced technical interviewer who uses provided context as a RAG knowledge base to craft challenging, conceptually deep questions.',
             llm=self.llm_openrouter,  # Use OpenRouter for question generation
             tools=[tools["question_generator"]],
             verbose=settings.DEBUG_MODE,

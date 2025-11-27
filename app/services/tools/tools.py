@@ -21,6 +21,9 @@ from app.schemas.interview import (
 )
 from app.services.tools.llm_config import llm_openrouter
 from app.services.tools.source_discovery import discover_sources
+from app.services.tools.utils import safe_api_call
+import asyncio
+
 
 logger = logging.getLogger(__name__)
 
@@ -74,45 +77,80 @@ def file_text_extractor(file_path: str) -> str:
 
 
 @tool
-async def grounded_source_discoverer(skills: List[str]) -> List[Dict]:
+async def grounded_source_discoverer(skills: List[str]) -> Dict:
     """
     Asynchronously retrieves Gemini's native search response for a list of skills.
     This function returns the raw Gemini response text for each skill,
     providing context for question generation by the third agent.
     """
-    return await discover_sources(skills)
+    results = await discover_sources(skills)
+    return {"all_sources": results}
+
+
 
 
 @tool
-def question_generator(skill: str, sources_content: str) -> str:
+async def question_generator(all_skill_sources_json: str) -> str:
     """
-    Generates interview questions based on a provided skill and contextual content.
-
+    Generates interview questions for a batch of skills in parallel.
+    
     Args:
-        skill: The technical skill to generate questions for.
-        sources_content: The context to use for generating questions.
-
+        all_skill_sources_json: A JSON string conforming to the AllSkillSources schema.
+        
     Returns:
-        A JSON string containing the generated questions or an error message.
-    """
-    prompt = f"""As an expert interviewer, generate insightful, non-coding questions for a candidate skilled in "{skill}",
-    based ONLY on the provided Context.
-    Context: {sources_content}
-    Respond with a single, valid JSON object with a "questions" key, which is an array of unique strings.
+        A JSON string conforming to the AllInterviewQuestions schema.
     """
     try:
-        llm_response = llm_openrouter.call(
-            messages=[{"role": "user", "content": prompt}]
-        )
-        questions_data = json.loads(llm_response)
-        questions_list = questions_data.get("questions", [])
+        # Parse input
+        sources_data = json.loads(all_skill_sources_json)
+        all_sources = AllSkillSources(**sources_data)
+        
+        # Define the single question generation function (internal helper)
+        async def generate_single_skill_questions(skill_source) -> InterviewQuestions:
+            skill = skill_source.skill
+            # Extract content from the structured object
+            # Note: extracted_content is now a List[str]
+            if skill_source.extracted_content:
+                context = "\n".join(skill_source.extracted_content)
+            else:
+                context = f"No specific context found for {skill}."
+            
+            prompt = f"""As an expert technical interviewer, your goal is to assess a candidate's deep understanding of "{skill}".
+            
+            Use the provided Context below as a knowledge base (RAG) to ground your questions in relevant topics and terminology.
+            Combine this context with your own expert knowledge to generate insightful, non-coding interview questions that test conceptual depth, problem-solving, and architectural understanding.
+            
+            Context:
+            {context}
+            
+            Respond with a single, valid JSON object with a "questions" key, which is an array of unique strings.
+            """
+            
+            try:
+                # Use safe_api_call for rate limiting and retries
+                llm_response = await safe_api_call(
+                    llm_openrouter.call,
+                    messages=[{"role": "user", "content": prompt}],
+                    service='openrouter'
+                )
+                
+                questions_data = json.loads(llm_response)
+                questions_list = questions_data.get("questions", [])
+                return InterviewQuestions(skill=skill, questions=questions_list)
+                
+            except Exception as e:
+                logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
+                return InterviewQuestions(skill=skill, questions=[f"Error generating questions: {str(e)}"])
 
-        interview_questions = InterviewQuestions(skill=skill, questions=questions_list)
-        return AllInterviewQuestions(all_questions=[interview_questions]).json()
+        # Execute in parallel
+        tasks = [generate_single_skill_questions(source) for source in all_sources.all_sources]
+        results = await asyncio.gather(*tasks)
+        
+        return AllInterviewQuestions(all_questions=list(results)).json()
 
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error for '{skill}': {e}", exc_info=True)
-        return json.dumps({"skill": skill, "questions": [], "error": f"Failed to parse LLM response: {e}"})
+        logger.error(f"JSON parsing error in batch_question_generator: {e}", exc_info=True)
+        return json.dumps({"error": f"Failed to parse input JSON: {e}"})
     except Exception as e:
-        logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
-        return json.dumps({"skill": skill, "questions": [], "error": f"Question generation failed: {e}"})
+        logger.error(f"Unexpected error in batch_question_generator: {e}", exc_info=True)
+        return json.dumps({"error": f"Unexpected error: {e}"})

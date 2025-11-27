@@ -11,8 +11,9 @@ from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import (
     file_text_extractor,
-   grounded_source_discoverer,
+    grounded_source_discoverer,
     question_generator,
+   
 )
 from app.core.config import settings # Import settings
 
@@ -38,7 +39,7 @@ class InterviewPrepCrew:
         self.tools = {
             "file_text_extractor": file_text_extractor,
             "grounded_source_discoverer": grounded_source_discoverer,
-            "question_generator": question_generator
+            "question_generator": question_generator,
         }
         self.tasks = InterviewPrepTasks()
         self.logger = logging.getLogger(__name__)
@@ -70,8 +71,7 @@ class InterviewPrepCrew:
         # This task uses both the extracted skills and discovered sources to generate questions
         question_task = self.tasks.generate_questions_task(
             question_generator_agent,
-            "",  # Empty string - CrewAI will automatically provide the context from skills_task
-            sources_content=""  # Empty string - CrewAI will automatically provide the context from discover_task
+            context="" # Empty string - CrewAI will automatically provide the context from discover_task
         )
 
         # Set up task dependencies - CrewAI will automatically pass outputs

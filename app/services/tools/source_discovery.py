@@ -11,22 +11,20 @@ from typing import Optional, Dict, List, Any
 
 from google.genai import types
 from google.api_core.exceptions import (
-    ClientError,
     ResourceExhausted,
-    ServiceUnavailable,
     TooManyRequests,
 )
 
-from app.schemas.interview import AllSkillSources, SkillSources
 from app.services.tools.llm_config import get_genai_client, GEMINI_MODEL
 from app.services.tools.helpers import optimize_search_query
 from app.services.tools.utils import safe_api_call
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
-
+# --- CONFIGURATION ---
+# Limits parallel requests to avoid 429 Errors. 
+# Increase to 5-10 if you have a high-tier enterprise quota.
+MAX_CONCURRENT_REQUESTS = 3 
 
 def create_fallback_sources(
     skill: str,
@@ -35,179 +33,217 @@ def create_fallback_sources(
     """Create fallback content when primary search fails."""
     content_msg = f"Fallback response for {skill}. Consider manual search for better results."
     if error_message:
-        content_msg += f"\n\nDEBUG INFO: Search failed with error: {error_message}"
+        # Sanitize error message to prevent JSON issues
+        clean_err = error_message.replace('"', "'").replace('\n', ' ')
+        content_msg += f"\n\nDEBUG INFO: Search failed with error: {clean_err}"
     
     return {
         "skill": skill,
-        "raw_content": content_msg
+        "extracted_content": [content_msg],
     }
-
 
 async def discover_sources(skills: List[str]) -> List[Dict]:
     """
     Discover authoritative web sources using Gemini's native search grounding.
     
-    This function uses Google Search grounding to find relevant technical resources
-    for a list of skills, batching them to optimize requests.
-    
-    Args:
-        skills: A list of skills/topics to search for.
-        
     Returns:
-        A list of dictionaries, each containing the skill and raw Gemini response text.
+        List[Dict]: Contains 'skill', 'extracted_content' (summary only), 
+                   
     """
     results = []
     chunk_size = 3
     
-    # Process skills in batches of 3
-    for i in range(0, len(skills), chunk_size):
-        chunk = skills[i:i + chunk_size]
-        logger.info(f"Processing batch: {chunk}")
-        
-        try:
-            # Generate optimized queries for the chunk
+    # Batch skills to optimize token usage
+    batches = [skills[i:i + chunk_size] for i in range(0, len(skills), chunk_size)]
+    
+    # Semaphore limits the number of active tasks at once
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    
+    # Initialize client once to save overhead
+    try:
+        client = get_genai_client()
+    except Exception as e:
+        logger.error(f"Failed to initialize GenAI client: {e}")
+        return [create_fallback_sources(s, error_message="Client Init Failed") for s in skills]
+
+    async def process_batch(chunk: List[str]) -> List[Dict]:
+        async with semaphore:
+            logger.info(f"Processing batch: {chunk}")
+            
+            # 1. Optimize Queries
             skills_with_queries = []
             for skill in chunk:
                 try:
                     opt_query = optimize_search_query(skill)
-    
                     skills_with_queries.append(f"- Skill: {skill} -> Query: {opt_query}")
                 except Exception as e:
-                    logger.warning(f"Query optimization failed for '{skill}': {e}. Using original.")
+                    logger.warning(f"Query optimization failed for '{skill}': {e}")
                     skills_with_queries.append(f"- Skill: {skill} -> Query: {skill}")
             
             skills_block = "\n".join(skills_with_queries)
 
-            # Construct the prompt for the batch using "Split-Search" pattern
-            prompt = f"You are an expert technical researcher. Perform a 'Split-Search' for the following skills using the specific queries provided:\n\n{skills_block}\n\n"
-            prompt += "For EACH skill in the list, you MUST:\n"
-            prompt += "1. Execute the EXACT provided search query for that skill.\n"
-            prompt += "2. Find exactly equivalent number of technical sources of each skill (minimum 3 sources per skill). THIS IS A HARD REQUIREMENT.\n"
-            prompt += "3. Extract dense technical content covering: core concepts, problem-solving, terminology, best practices, and challenges.\n\n"
-            
-            prompt += "CRITICAL OUTPUT RULES:\n"
-            prompt += "- You MUST separate the response for each skill with the marker '## {SkillName}'.\n"
-            prompt += "- Do NOT merge the results. Keep each skill's content distinct.\n"
-            prompt += "- Ensure the content is suitable for an expert interviewer.\n"
+            # 2. Construct Prompt (STRICT NO-LINK OUTPUT POLICY)
+            prompt = (
+                "You are an expert technical researcher. Perform a 'Split-Search' for the following skills.\n\n"
+                f"{skills_block}\n\n"
+                "INSTRUCTIONS:\n"
+                "For EACH skill, generate a response separated by the marker '## {SkillName}'.\n"
+                "1. GOAL: Extract dense, technical content for expert interviewers (trade-offs, misconceptions, patterns).\n"
+                "2. SOURCE HANDLING: Use Google Search to find information, BUT:\n"
+                "   - Synthesize the knowledge into your own words.\n"
+                "   - Do NOT output a 'Sources' or 'References' list.\n"
+                "   - Do NOT output URLs or website titles in the text.\n"
+                "   - The final output must look like pure expert knowledge.\n"
+                "3. FORMAT:\n"
+                "   ## {SkillName}\n"
+                "   [Deep technical summary paragraphs...]\n"
+                "   (Repeat for all skills)\n"
+                "   IMPORTANT: You MUST provide a section for EVERY requested skill. Do not combine them.\n"
+                "   ENSURE the header is exactly '## {SkillName}' with no extra colons or words.\n"
+            )
 
-            # Execute search with Google Search grounding
+            # 3. Configure Tool
+            grounding_tool = types.Tool(google_search=types.GoogleSearch())
+            config = types.GenerateContentConfig(tools=[grounding_tool])
+
             try:
-                client = get_genai_client()
-            except Exception as e:
-                logger.error(f"Failed to initialize GenAI client: {e}")
-                results.extend([create_fallback_sources(s, error_message="LLM Client Initialization Failed") for s in chunk])
-                continue
-
-            # Configure Google Search grounding tool
-            grounding_tool = types.Tool(
-                google_search=types.GoogleSearch()
-            )
-            
-            config = types.GenerateContentConfig(
-                tools=[grounding_tool]
-            )
-
-            # Execute grounded search with retry logic using dedicated rate limiter
-            response = await safe_api_call(
+                # 4. Execute Safe API Call
+                response = await safe_api_call(
                     asyncio.to_thread,
                     client.models.generate_content,
                     model=GEMINI_MODEL,
                     contents=prompt,
-                    config=config,
-                    service='gemini'
+                    config=config
                 )
 
-            response_text = response.text if response.text else ""
-            
-            # Parse the response to separate content for each skill
-            batch_results = parse_batch_response(response_text, chunk, response)
-            results.extend(batch_results)
+                response_text = response.text if response.text else ""
+                
+                # Extract Metadata for internal logging
+                grounding_meta = None
+                if response.candidates and response.candidates[0].grounding_metadata:
+                    grounding_meta = response.candidates[0].grounding_metadata
 
-        except asyncio.TimeoutError:
-            logger.error(f"Search timed out for batch {chunk}")
-            results.extend([create_fallback_sources(s, error_message="Search timed out.") for s in chunk])
-        except (ResourceExhausted, TooManyRequests) as e:
-            logger.error(f"Rate limit exceeded for batch {chunk}: {e}")
-            results.extend([create_fallback_sources(s, error_message="Rate limit exceeded.") for s in chunk])
-        except Exception as e:
-            logger.error(f"Search failed for batch {chunk}: {e}", exc_info=True)
-            results.extend([create_fallback_sources(s, error_message=str(e)) for s in chunk])
+                # Handle empty text with metadata (Edge case)
+                if not response_text and grounding_meta:
+                     response_text = "Search completed but no summary generated."
+
+                return parse_batch_response(response_text, chunk, grounding_meta)
+
+            except asyncio.TimeoutError:
+                logger.error(f"Search timed out for batch {chunk}")
+                return [create_fallback_sources(s, "Search timed out") for s in chunk]
+            except (ResourceExhausted, TooManyRequests) as e:
+                logger.error(f"Rate limit exceeded for batch {chunk}: {e}")
+                return [create_fallback_sources(s, "Rate limit exceeded") for s in chunk]
+            except Exception as e:
+                logger.error(f"Search failed for batch {chunk}: {e}", exc_info=True)
+                return [create_fallback_sources(s, str(e)) for s in chunk]
+
+    # Process all batches with concurrency control
+    batch_results_list = await asyncio.gather(*[process_batch(batch) for batch in batches])
+    
+    # Flatten results
+    for batch_res in batch_results_list:
+        results.extend(batch_res)
 
     return results
-
-def parse_batch_response(text: str, skills: List[str], response: Any) -> List[Dict]:
+def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any = None) -> List[Dict]:
     """
-    Parses the batch response text to extract content for each skill.
-    Uses markers '## {SkillName}' to split the text.
-    Also maps grounding metadata to verify sources.
+    Robustly parses batch response and maps grounding metadata using raw indices.
     """
-    results = []
+    # 1. CLEANUP & NORMALIZE
+    # We create a normalized map to handle casing issues (e.g., LLM writes "Python" vs "python")
+    skill_map = {s.lower().strip(): s for s in skills}
+    results_map = {s: {"content": "", "source_count": 0, "found": False} for s in skills}
     
-    # Create a map of skill to its content
-    skill_content_map = {}
+    # 2. IDENTIFY SECTIONS (Inverted Logic)
+    # Instead of searching for specific skills, we look for the structure (Headers)
+    # Pattern: Start of line, ## or **, capture title, optional colon/whitespace, end of line
+    header_pattern = re.compile(r'(?m)^(?:#{2,6}|\*\*)\s*(.+?)(?::)?\s*$')
     
-    # Find start indices of each skill marker
-    skill_positions = []
-    for skill in skills:
-        # Case insensitive search for the marker
-        pattern = re.compile(re.escape(f"## {skill}"), re.IGNORECASE)
-        match = pattern.search(text)
-        if match:
-            skill_positions.append((match.start(), skill))
-        else:
-            logger.warning(f"Marker '## {skill}' not found in response.")
-            
-    # Sort by position
-    skill_positions.sort(key=lambda x: x[0])
+    matches = list(header_pattern.finditer(raw_text))
     
-    # Extract content slices
-    for i, (start_pos, skill) in enumerate(skill_positions):
-        end_pos = skill_positions[i+1][0] if i + 1 < len(skill_positions) else len(text)
+    # Create sections with start/end indices based on the RAW text
+    sections = []
+    for i, match in enumerate(matches):
+        section_title = match.group(1).lower().strip()
+        start_idx = match.start()
         
-        content_chunk = text[start_pos:end_pos]
+        # End index is the start of the next header, or end of string
+        end_idx = matches[i+1].start() if i + 1 < len(matches) else len(raw_text)
         
-        # Remove the marker line
-        lines = content_chunk.split('\n')
-        if lines and lines[0].strip().lower().startswith(f"## {skill}".lower()):
-            content_chunk = "\n".join(lines[1:]).strip()
+        # Fuzzy match the header title to our requested skills
+        # This handles cases like LLM writing "## Python Logic" instead of "## Python"
+        matched_skill = None
+        for key in skill_map:
+            if key == section_title or (key in section_title and len(section_title) < len(key) + 10):
+                matched_skill = skill_map[key]
+                break
         
-        # Map citations
-        sources_found = []
-        if hasattr(response, 'candidates') and response.candidates:
-            candidate = response.candidates[0]
-            if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
-                metadata = candidate.grounding_metadata
-                if hasattr(metadata, 'grounding_supports') and metadata.grounding_supports:
-                    for support in metadata.grounding_supports:
-                        # Check if support segment is within our chunk
-                        seg_start = support.segment.start_index
-                        seg_end = support.segment.end_index
-                        
-                        if seg_start >= start_pos and seg_end <= end_pos:
-                            # This support belongs to this skill
-                            if hasattr(metadata, 'grounding_chunks') and metadata.grounding_chunks:
-                                for chunk_idx in support.grounding_chunk_indices:
-                                    if chunk_idx < len(metadata.grounding_chunks):
-                                        chunk_data = metadata.grounding_chunks[chunk_idx]
-                                        if hasattr(chunk_data, 'web'):
-                                            sources_found.append(chunk_data.web.uri)
-        
-        # Deduplicate sources
-        sources_found = list(set(sources_found))
-        
-        logger.info(f"Skill '{skill}': Found {len(sources_found)} unique sources.")
-        
-        # Append sources to content for the Agent to see
-        if sources_found:
-            content_chunk += "\n\n### Discovered Sources:\n" + "\n".join(f"- {url}" for url in sources_found)
-            
-        skill_content_map[skill] = content_chunk
+        if matched_skill:
+            sections.append({
+                "skill": matched_skill,
+                "start": start_idx,
+                "end": end_idx,
+                "content": raw_text[start_idx:end_idx].strip()
+            })
 
-    # Fill results, handling missing skills
-    for skill in skills:
-        if skill in skill_content_map:
-            results.append({"skill": skill, "raw_content": skill_content_map[skill]})
-        else:
-            results.append(create_fallback_sources(skill, error_message="Skill content not found in batch response."))
+    # 3. MAP GROUNDING METADATA
+    # We do this logic BEFORE modifying the content strings significantly
+    if grounding_meta and hasattr(grounding_meta, 'grounding_supports'):
+        chunks = grounding_meta.grounding_chunks
+        supports = grounding_meta.grounding_supports
+        
+        for section in sections:
+            seen_urls = set()
             
-    return results
+            for support in supports:
+                # API returns None for 0 indices sometimes, handle safely
+                s_start = support.segment.start_index or 0
+                s_end = support.segment.end_index or 0
+                
+                # Check intersection: Does the support segment fall inside this section?
+                if s_start >= section["start"] and s_start < section["end"]:
+                    
+                    for chunk_idx in support.grounding_chunk_indices:
+                        if chunk_idx < len(chunks):
+                            url = chunks[chunk_idx].web.uri
+                            if url not in seen_urls:
+                                seen_urls.add(url)
+            
+            # Update the results map with the count
+            results_map[section["skill"]]["source_count"] = len(seen_urls)
+
+    # 4. FORMAT FINAL OUTPUT
+    # Now we clean up the text (remove the header line) for the final user
+    final_output = []
+    
+    for section in sections:
+        skill = section["skill"]
+        # Remove the first line (the header) to leave only the body
+        lines = section["content"].split('\n')
+        body_text = "\n".join(lines[1:]).strip() if len(lines) > 1 else lines[0]
+        
+        results_map[skill]["content"] = body_text
+        results_map[skill]["found"] = True
+
+    # Convert map to list, maintaining original order
+    for skill in skills:
+        data = results_map[skill]
+        if data["found"]:
+            final_output.append({
+                "skill": skill,
+                "extracted_content": [data["content"]],
+                # "meta_source_count": data["source_count"] # Optional: Expose if needed
+            })
+            if data["source_count"] > 0:
+                logger.info(f"Skill '{skill}' synthesized from {data['source_count']} sources.")
+        else:
+            # Fallback for missing sections
+            logger.warning(f"Parser could not find section for '{skill}'")
+            final_output.append({
+                "skill": skill,
+                "extracted_content": [f"Fallback: AI failed to structure response for {skill}."]
+            })
+
+    return final_output

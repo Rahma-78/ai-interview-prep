@@ -60,24 +60,34 @@ class InterviewPrepTasks:
         description += (
             "The tool will batch the searches and return content for each skill. "
             "Focus on extracting substantial text-based content that can be used as context for generating interview questions. "
-            "CRITICAL: Trust the tool's output completely. Do NOT try to invent sources or search again."
-        )
+            "CRITICAL: The final output must be a strict JSON object matching the 'AllSkillSources' schema. "
+            "The 'extracted_content' field must contain ONLY the technical summary text. "
+            "Do NOT include any URLs, links, or 'Sources' sections in the content."
+         )
 
         return Task(
             description=description,
             agent=agent,
-            expected_output="A JSON object conforming to the AllSkillSources schema, containing the list of skills and their extracted content."
+            expected_output="A JSON object conforming to the AllSkillSources schema, containing the list of skills and their extracted content.",
+            output_json=AllSkillSources
+
         )
 
-    def generate_questions_task(self, agent: Agent, skill: str, sources_content: str) -> Task:
+    def generate_questions_task(self, agent: Agent, context: str = None) -> Task:
         """
         Defines the task for generating interview questions based on extracted skills and source content.
+        This task processes a BATCH of skills using the 'question_generator' tool.
         """
+        description = (
+            "Generate insightful, non-coding interview questions for the provided batch of skills. "
+            "You will receive a JSON object conforming to 'AllSkillSources' which contains skills and their context. "
+            "Use the 'question_generator' tool to process ALL skills in parallel. "
+            "The tool will return a JSON object with questions for each skill."
+        )
+        
         return Task(  # type: ignore
-            description=f"Generate insightful, non-coding interview questions for a candidate skilled in '{skill}'. "
-                       "Base the questions ONLY on the information from these sources:\n{sources_content}. "
-                       "Use the 'Question Generator Tool' to return only a JSON object with a single key 'questions' which is an array of unique question strings.",
+            description=description,
             agent=agent,
-            expected_output="A JSON string with a 'questions' key, containing an array of unique interview question strings.",
+            expected_output="A JSON string conforming to the AllInterviewQuestions schema, containing questions for all skills.",
             output_json=AllInterviewQuestions # Enforce output format
         )
