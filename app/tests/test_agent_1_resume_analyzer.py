@@ -45,7 +45,7 @@ async def main():
         logger.info("Extraction completed.")
         
         # Check output file
-        output_path = "app/tests/extracted_skills.json"
+        output_path = "app/data/extracted_skills.json"
         if os.path.exists(output_path):
             with open(output_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)

@@ -4,6 +4,7 @@ import re
 from app.schemas.interview import AllSkillSources, SkillSources
 
 logger = logging.getLogger(__name__)
+
 def create_fallback_sources(
     skill: str,
     error_message: Optional[str] = None
@@ -142,3 +143,39 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
             })
 
     return final_output
+
+
+def clean_llm_json_output(text: str) -> str:
+    """
+    Robustly extracts JSON object from LLM response using Regex.
+    Handles markdown code blocks, text prefixes/suffixes, and whitespace.
+    """
+    if not text:
+        return ""
+        
+    # 1. Try to find JSON inside markdown code blocks
+    markdown_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
+    match = re.search(markdown_pattern, text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    # 2. If no markdown, try to find the first outer-most JSON object
+    # This looks for the first '{' and the last '}'
+    start_idx = text.find('{')
+    end_idx = text.rfind('}')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        return text[start_idx : end_idx + 1]
+
+    # 3. Fallback: Return original text (stripped) if no pattern matches
+    # Try to strip common prefixes/suffixes if regex failed
+    text = text.strip()
+    
+    # Remove "**Final Answer**:" or "Final Answer:" prefixes
+    text = re.sub(r"^\**Final Answer\**:\s*", "", text, flags=re.IGNORECASE).strip()
+    
+    # Remove leading/trailing backticks if present (e.g. `{"foo": "bar"}`)
+    if text.startswith("`") and text.endswith("`"):
+        text = text[1:-1].strip()
+        
+    return text

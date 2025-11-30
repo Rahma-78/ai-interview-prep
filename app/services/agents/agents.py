@@ -1,8 +1,8 @@
 from crewai import Agent 
 from typing import List, Dict, Callable
 
-from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills
-from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter
+from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills, InterviewQuestions
+from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
 from app.core.config import settings # Import settings
 
 # ============================================================================
@@ -22,6 +22,7 @@ class InterviewPrepAgents:
         self.llm_gemini = llm_gemini
         self.llm_groq = llm_groq
         self.llm_openrouter = llm_openrouter
+        self.llm_deepseek = llm_deepseek
 
 
     def resume_analyzer_agent(self, tools: Dict[str, Callable]) -> Agent:
@@ -31,7 +32,7 @@ class InterviewPrepAgents:
         return Agent( 
             role="Expert technical skill extraction agent",
             goal=(
-                "Extract exactly 10 high-impact technical skills from the resume that are ideal for verbal technical interviews. "
+                "Extract exactly 9 high-impact technical skills from the resume that are ideal for verbal technical interviews. "
                 "Focus on core competencies, architectural concepts, and design principles."
             ),
             backstory=(
@@ -40,6 +41,7 @@ class InterviewPrepAgents:
                 "You distinguish between surface-level tools and genuine technical competencies suitable for deep verbal discussion. "
                 "You prioritize skills that enable questions about 'how' and 'why' rather than just 'what'."
             ),
+            
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
             verbose=settings.DEBUG_MODE,  # Reduce verbose output to improve performance
@@ -82,10 +84,9 @@ class InterviewPrepAgents:
             role='Question Generator',
             goal='Generate insightful, non-coding interview questions using provided sources as a knowledge base combined with expert technical knowledge.',
             backstory='An experienced technical interviewer who uses provided context as a RAG knowledge base to craft challenging, conceptually deep questions.',
-            llm=self.llm_openrouter,  # Use OpenRouter for question generation
+            llm=self.llm_deepseek,  
             tools=[tools["question_generator"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            async_execution=True,  # Enable async execution for better performance
-            response_format=AllInterviewQuestions  # Enforce output format
+            response_format=InterviewQuestions  # Enforce output format
         )

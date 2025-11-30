@@ -14,33 +14,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import grounded_source_discoverer
+from app.services.tools.helpers import clean_llm_json_output
 from app.schemas.interview import AllSkillSources
 from app.core.config import settings
 
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-def extract_json_from_text(text: str):
-    """
-    Robustly extracts JSON from text that might contain Markdown code blocks
-    or conversational filler.
-    """
-    # 1. Try to find a JSON code block first
-    code_block_pattern = r"```(?:json)?\s*(\{.*\}|\[.*\])\s*```"
-    match = re.search(code_block_pattern, text, re.DOTALL)
-    if match:
-        return match.group(1)
-
-    # 2. If no code block, try to find the first valid JSON array or object
-    # This looks for the outermost [ ... ] or { ... }
-    json_pattern = r"(\{[\s\S]*\}|\[[\s\S]*\])"
-    match = re.search(json_pattern, text, re.DOTALL)
-    if match:
-        return match.group(1)
-
-    # 3. Fallback: Return original text (will likely fail parsing, but worth a try)
-    return text
 
 async def test_source_discoverer_agent(skills_from_agent1: list):
     """
@@ -98,7 +78,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             raw_output = str(search_result)
 
         # Use robust extraction helper
-        clean_json_text = extract_json_from_text(raw_output)
+        clean_json_text = clean_llm_json_output(raw_output)
         
         parsed_data = None
         
@@ -140,12 +120,8 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
             logging.info(f"Debug data saved to {debug_path}")
             raise e
 
-        # Save the Validated Results
-        output_path = "app/tests/discovered_sources.json"
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(final_model.model_dump_json(indent=2))
-        
-        logging.info(f"Results saved to: {output_path}")
+        # Note: Manual saving/verification block removed as requested.
+        # The task is configured to save to app/data/context.json automatically.
         
         return {
             "input_skills": skills_from_agent1,
@@ -161,7 +137,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
         }
 
 if __name__ == "__main__":
-    agent1_output_path = "app/tests/extracted_skills.json"
+    agent1_output_path = "app/data/extracted_skills.json"
     
     if not os.path.exists(agent1_output_path):
         logging.error(f"Error: Agent 1 output not found at {agent1_output_path}")

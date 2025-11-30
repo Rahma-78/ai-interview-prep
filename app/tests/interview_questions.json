@@ -1,0 +1,136 @@
+{
+  "all_questions": [
+    {
+      "skill": "Machine Learning",
+      "questions": [
+        "Explain the bias-variance tradeoff in machine learning models, including how it manifests in underfitting and overfitting, and discuss strategies to manage it such as regularization or ensemble methods.",
+        "Describe the three-stage process of model building, testing, and application in machine learning, and explain why separating training and testing data is crucial.",
+        "For classification problems, when would you prefer a model with high bias and low variance over one with low bias and high variance, and how does dataset size influence this choice?",
+        "Differentiate between model parameters (like weights and biases) and hyperparameters (like learning rate or number of hidden layers), and explain why hyperparameter tuning is essential for model performance.",
+        "What are the advantages of ensemble learning methods like bagging and boosting? Provide examples of how they achieve diversity among models to improve predictive accuracy, and discuss their computational trade-offs.",
+        "Beyond accuracy, which evaluation metrics would you use for a binary classification model, and under what scenarios would you prioritize metrics like F1 score, AUC-ROC, or Gini Coefficient over simple accuracy? Describe what a Confusion Matrix reveals.",
+        "How does the choice of algorithm impact model performance in classification tasks, and why is cross-validation recommended when testing multiple algorithms?",
+        "Discuss common pitfalls in hyperparameter selection, such as relying on defaults, and techniques like early stopping or grid search to mitigate overfitting.",
+        "What ethical considerations, such as fairness, transparency, accountability, and privacy, should be addressed during machine learning model development and deployment, and how can biases be identified and mitigated?",
+        "Explain the role of Gain and Lift charts in model evaluation, particularly for imbalanced datasets or marketing applications, and how they differ from ROC curves."
+      ]
+    },
+    {
+      "skill": "Deep Learning",
+      "questions": [
+        "Explain the role of depth in neural networks and why deeper networks can learn more intricate features compared to shallow ones.",
+        "What is the purpose of activation functions in deep learning, and what would happen to a deep network without them?",
+        "Describe the vanishing gradient problem and discuss at least three strategies to mitigate it.",
+        "Compare and contrast batch gradient descent, stochastic gradient descent, and mini-batch gradient descent in terms of convergence speed, stability, and memory usage.",
+        "How does Batch Normalization work, and why does it accelerate training and improve stability in deep networks?",
+        "Explain the mechanism of Dropout as a regularization technique and how it prevents overfitting.",
+        "Discuss the advantages of Transformers over traditional RNNs or LSTMs for processing sequential data, including any trade-offs.",
+        "Why are Convolutional Neural Networks (CNNs) particularly effective for grid-like data such as images, and what key components enable this?",
+        "What role do weight initialization techniques play in training deep networks, and why is poor initialization problematic?",
+        "Outline the key considerations for deploying deep learning models at scale, including hardware utilization and optimization strategies."
+      ]
+    },
+    {
+      "skill": "Natural Language Processing",
+      "questions": [
+        "Explain the key differences between stemming and lemmatization, including their mechanisms, trade-offs in accuracy and speed, and scenarios where one might be preferred over the other.",
+        "How does tokenization serve as the foundation for NLP pipelines, and what challenges arise with subword tokenization in models like BERT for handling out-of-vocabulary words?",
+        "Describe the role of word embeddings in capturing semantic relationships, and contrast static embeddings like Word2Vec with contextualized ones in Transformer-based models.",
+        "What are attention mechanisms, and how do they address the limitations of recurrent neural networks in handling long-range dependencies in sequences?",
+        "Outline the architecture of a Transformer model, explaining self-attention and its advantages over traditional sequence-to-sequence models with encoders and decoders.",
+        "Discuss the importance of Part-of-Speech (POS) tagging and Named Entity Recognition (NER) in downstream NLP tasks, including how they contribute to information extraction.",
+        "How would you preprocess noisy text data containing slang, abbreviations, and multilingual elements, and what strategies mitigate issues in low-resource languages?",
+        "Identify common sources of bias in NLP models trained on corpora, and propose architectural or training-time techniques to detect and reduce such biases.",
+        "Compare the pre-training objectives and fine-tuning approaches of BERT and GPT models, highlighting their impacts on tasks like question answering versus text generation.",
+        "Why is removing stop words beneficial in traditional NLP pipelines, and how do modern Transformer models handle such noise without explicit removal?"
+      ]
+    },
+    {
+      "skill": "Computer Vision",
+      "questions": [
+        "How does Computer Vision differ from traditional image processing, and what are the key components of a typical Computer Vision pipeline?",
+        "Explain the Scale-Invariant Feature Transform (SIFT) algorithm, including how it achieves invariance to scale and rotation, and discuss its limitations in modern applications.",
+        "Describe the Histogram of Oriented Gradients (HOG) descriptor and why it is particularly effective for pedestrian detection.",
+        "What are Haar Cascades, and how do they enable real-time object detection? Discuss their strengths and weaknesses compared to deep learning approaches.",
+        "Why are preprocessing steps like noise reduction, resizing, and color space transformations critical in Computer Vision systems, and how can they impact downstream model performance?",
+        "Discuss the role of image augmentation in improving model robustness, providing examples of common augmentation techniques and scenarios where they are most beneficial.",
+        "Outline the architecture of a Convolutional Neural Network (CNN), explaining the purpose of convolutional layers, pooling layers, and the concept of receptive fields.",
+        "What is transfer learning in the context of CNNs? Describe how pre-trained models from datasets like ImageNet can be adapted for new tasks such as object detection.",
+        "Differentiate between image classification and object detection tasks in Computer Vision, including common challenges like occlusions, lighting variations, and orientation changes.",
+        "How do deeper layers in a CNN capture higher-level semantic features, and what architectural innovations (e.g., skip connections) address the vanishing gradient problem in very deep networks?"
+      ]
+    },
+    {
+      "skill": "Large Language Models",
+      "questions": [
+        "Explain the role of self-attention mechanisms in the Transformer architecture and why positional encodings are essential for LLMs.",
+        "Compare pre-training and fine-tuning phases in LLMs, including how transfer learning leverages pre-trained knowledge for downstream tasks.",
+        "What are the primary causes of overfitting in LLMs, and describe regularization techniques specifically effective for mitigating it during training.",
+        "Discuss the impact of key hyperparameters such as learning rate schedules, batch size, and maximum sequence length on LLM training stability and performance.",
+        "Describe gradient checkpointing and explain its benefits in managing memory constraints when training large-scale LLMs.",
+        "Compare and contrast model optimization techniques like knowledge distillation, quantization, and pruning for faster LLM inference, including their trade-offs.",
+        "What is prompt engineering, and how can subtle changes in prompt design significantly influence the output quality of LLMs? Provide conceptual examples.",
+        "Explain few-shot learning and in-context learning in LLMs, and discuss why these capabilities reduce the need for extensive model retraining.",
+        "How do LLMs based on Transformers handle long-range dependencies more effectively than traditional recurrent neural networks like LSTMs?",
+        "What challenges arise when deploying LLMs in production, such as hallucinations or biases, and outline architectural or training strategies to address them?"
+      ]
+    },
+    {
+      "skill": "Generative AI",
+      "questions": [
+        "Explain the core principle of how generative AI learns the underlying distribution of training data to produce novel content, and contrast this with discriminative models.",
+        "How do Large Language Models represent a subset of Generative AI, and what architectural features enable their text generation capabilities?",
+        "Discuss the role of Generative AI in data augmentation for expanding limited datasets. What benefits does it provide for model robustness, and what risks might arise from synthetic data?",
+        "Why are training costs for large generative models substantial, and how do strategies like transfer learning, distributed training, and efficient data sampling address these challenges?",
+        "Compare model optimization techniques such as quantization and pruning. How do they reduce resource usage during training and inference while preserving performance?",
+        "Why is explainability crucial in Generative AI for applications like legal summarization or medical diagnostics, and what methods can enhance interpretability of model outputs?",
+        "Describe Reinforcement Learning from Human Feedback (RLHF) and its application in mitigating harmful outputs in generative systems.",
+        "What is Constitutional AI, and how does it help align generative models with ethical guidelines?",
+        "How can biases in training data lead to problematic outputs in generative models, and what development practices like ethics modules can mitigate this?",
+        "What architectural and safety challenges emerge when scaling generative model capabilities, and how can techniques like RLHF balance performance with alignment?"
+      ]
+    },
+    {
+      "skill": "Data Analysis",
+      "questions": [
+        "How do you engage with stakeholders at the beginning of a data analysis project to ensure the problem definition aligns with business objectives?",
+        "Describe your systematic approach to data exploration and quality assessment, including how you identify and validate data accuracy.",
+        "Explain the different strategies for handling missing data, such as deletion versus imputation, and discuss the potential biases each can introduce depending on the missingness mechanism.",
+        "When selecting analytical techniques like regression or clustering, how do you evaluate their assumptions and limitations to avoid common pitfalls like applying linear models to non-linear relationships?",
+        "What is the bias-variance tradeoff, and how does it manifest in overfitting versus underfitting? Provide an example of how you'd address overfitting in a predictive analysis project.",
+        "How do you validate your analytical findings, including methods for data integrity checks and considering alternative explanations for observed patterns?",
+        "Describe how you translate complex technical insights from data analysis into clear, actionable recommendations for non-technical stakeholders, emphasizing the 'so what' of your findings."
+      ]
+    },
+    {
+      "skill": "Data Manipulation & Visualization",
+      "questions": [
+        "Explain the trade-offs between destructive methods like dropping rows with missing values and non-destructive methods like imputation in data manipulation. How do these choices impact downstream analysis?",
+        "Describe the computational complexity implications of performing large-scale joins in Pandas without indexing. What strategies would you use to optimize such operations and avoid out-of-memory errors?",
+        "How do misconceptions about data integrity after merging datasets, such as introducing duplicates, affect analysis? Walk through how to properly manage join keys.",
+        "What distinguishes vectorized operations from iterative loops in libraries like Pandas and NumPy, and why are they critical for handling large datasets efficiently?",
+        "In data manipulation pipelines, when would you prefer in-place modifications to DataFrames over creating new copies, considering memory usage and performance?",
+        "Discuss the rationale for selecting specific chart types, such as histograms for distributions versus scatter plots for relationships, and common pitfalls in these choices.",
+        "Why are pie charts problematic for datasets with many categories, and what alternative visualizations would you recommend to better convey comparisons?",
+        "Explain the iterative process of exploration, transformation, and visualization. How can initial visualizations guide further data manipulations?",
+        "What trade-offs exist between providing comprehensive detail and maintaining visual clarity in interactive dashboards, and how do you balance them for different audiences?",
+        "How do you validate visualizations against raw data to prevent bias or misrepresentation, and what role does audience technical acumen play in design decisions?"
+      ]
+    },
+    {
+      "skill": "API Integration",
+      "questions": [
+        "Explain the key differences between RESTful APIs and SOAP APIs, including their architectural styles, data formats, and typical use cases.",
+        "Describe common authentication and authorization mechanisms like OAuth, API keys, and JWTs, and discuss their trade-offs in terms of security and implementation complexity.",
+        "How would you design an API integration to handle rate limiting effectively, and what strategies would you use to avoid service disruptions?",
+        "What is idempotency in the context of API operations, and why is it crucial for robust integrations? Provide an example.",
+        "Outline a retry mechanism with exponential backoff for handling transient failures in API calls. What factors influence the backoff interval?",
+        "Compare real-time integration approaches like webhooks and streaming APIs versus batch processing methods. When would you choose one over the other based on data volume and latency needs?",
+        "Walk through your troubleshooting process for an API integration issue, including tools, logs, and common pitfalls to check.",
+        "Discuss security best practices for API integrations, such as data encryption in transit, credential management, and mitigating common vulnerabilities like injection attacks.",
+        "How do you ensure backward compatibility when dealing with API versioning in integrations? What strategies like semantic versioning or URI versioning would you employ?",
+        "Describe the trade-offs between building custom API connectors versus using integration platforms like Zapier or MuleSoft, considering factors like flexibility, maintenance, and scalability."
+      ]
+    }
+  ]
+}

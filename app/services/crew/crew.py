@@ -70,8 +70,7 @@ class InterviewPrepCrew:
         # Create the third task - generate questions based on skills and sources
         # This task uses both the extracted skills and discovered sources to generate questions
         question_task = self.tasks.generate_questions_task(
-            question_generator_agent,
-            context="" # Empty string - CrewAI will automatically provide the context from discover_task
+            question_generator_agent
         )
 
         # Set up task dependencies - CrewAI will automatically pass outputs

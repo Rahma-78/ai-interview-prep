@@ -65,9 +65,8 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
             skills_block = "\n".join(skills_with_queries)
 
             # 2. Construct Prompt (STRICT NO-LINK OUTPUT POLICY)
-            prompt = (
-                "You are an expert technical researcher. Perform a 'Split-Search' for the following skills.\n\n"
-                f"{skills_block}\n\n"
+            prompt = ("\n".join(["You are an expert technical researcher. Perform a 'Split-Search' for the following skills.\n"
+                f"{skills_block}\n"
                 "INSTRUCTIONS:\n"
                 "For EACH skill, generate a response separated by the marker '## {SkillName}'.\n"
                 "1. GOAL: Extract dense, technical content for expert interviewers (trade-offs, misconceptions, patterns).\n"
@@ -82,7 +81,7 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
                 "   (Repeat for all skills)\n"
                 "   IMPORTANT: You MUST provide a section for EVERY requested skill. Do not combine them.\n"
                 "   ENSURE the header is exactly '## {SkillName}' with no extra colons or words.\n"
-            )
+            ]))
 
             # 3. Configure Tool
             grounding_tool = types.Tool(google_search=types.GoogleSearch())

@@ -1,226 +1,195 @@
 """
-Test script for the third agent: Question Generator
-Uses the output from Agent 1 (skills) and Agent 2 (sources) as input
+Test script for the Question Generator Agent using the batch_question_generator tool.
+Tests the full Agent -> Task -> Tool flow.
 """
-
 import asyncio
 import json
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
-from crewai import Crew, Process
+from crewai import Crew, Process, Task
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from app.schemas.interview import (
-    AllInterviewQuestions,
-    AllSkillSources,
-    SkillSources,
-    Source,
-)
+from app.schemas.interview import AllSkillSources, AllInterviewQuestions, InterviewQuestions
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
-from app.services.tools.tools import question_generator, smart_web_content_extractor
+from app.services.tools.tools import question_generator
+from app.services.tools.helpers import clean_llm_json_output
 
-# Configure logging for tests
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
+async def test_question_generator_agent_flow():
+    """
+    Tests the Question Generator Agent with real input from discovered_sources.json.
+    Verifies that the Agent correctly calls the question_generator tool for each skill concurrently.
+    """
+    logger.info("Starting Question Generator Agent Test (Concurrent Flow)...")
 
-async def test_question_generator_agent(skills_from_agent1: list, sources_from_agent2: Dict[str, List[str]]):
-    """
-    Test the Question Generator Agent independently, with asynchronous processing of skills.
-    Uses skills and sources from Agents 1 and 2 as input.
-    
-    Args:
-        skills_from_agent1: List of skills from Agent 1 output
-        sources_from_agent2: Dictionary of sources from Agent 2 output (full version)
-    
-    Returns:
-        dict: Contains generated questions for each skill
-    """
-    
-    if not skills_from_agent1 or len(skills_from_agent1) == 0:
-        logging.error("Error: No skills provided from Agent 1")
-        return None
-    
-    if not sources_from_agent2 or len(sources_from_agent2) == 0:
-        logging.error("Error: No sources provided from Agent 2")
-        return None
-    
-    logging.info(f"\n{'='*60}")
-    logging.info(f"Testing Question Generator Agent")
-    logging.info(f"Skills to process: {len(skills_from_agent1)}")
-    logging.info(f"{'='*60}\n")
-    
+    # 1. Load Real Data (Context) from app/data/context.json
+    input_path = Path("app/data/context.json")
+    if not input_path.exists():
+        logger.error(f"Context file not found: {input_path}. Please run Agent 2 test first.")
+        return
+
+    try:
+        with open(input_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        # Validate input data
+        all_sources = AllSkillSources(**data)
+        logger.info(f"Loaded context for {len(all_sources.all_sources)} skills.")
+        
+    except Exception as e:
+        logger.error(f"Failed to validate input data: {e}")
+        return
+
+    # 2. Setup Agent and Tools
     agents = InterviewPrepAgents()
     tasks = InterviewPrepTasks()
     
-    tools = {
-        "question_generator": question_generator,
+    tools_dict = {
+        "question_generator": question_generator
     }
     
-    question_gen_agent = agents.question_generator_agent(tools)
-    
-    all_questions: Dict[str, Dict] = {}
+    # Create the agent once (stateless enough for this test)
+    question_agent = agents.question_generator_agent(tools_dict)
 
-    async def _process_single_skill(skill: str) -> Dict:
-        logging.info(f"\n[Processing Skill] {skill}")
-        logging.info("-" * 60)
-        
-        uris_for_skill = sources_from_agent2.get(skill, [])
-        
-        if not uris_for_skill:
-            logging.warning(f"  Warning: No URIs found for skill: {skill}")
-            return {
-                "questions": [],
-                "status": "no_sources",
-                "error": "No URIs available for content extraction"
-            }
-        
-        skill_sources_obj = AllSkillSources(all_sources=[
-            SkillSources(
-                skill=skill,
-                sources=[Source(uri=uri, title=f"Source for {skill}") for uri in uris_for_skill]
-            )
-        ])
-        
-        logging.info(f"  [Step 1] Extracting web content for skill: {skill} from {len(uris_for_skill)} URIs...")
-        sources_content = await smart_web_content_extractor(search_query=skill, urls=skill_sources_obj.json())
-        
-        if "Could not extract content" in sources_content or not sources_content:
-            logging.warning(f"  Warning: Could not extract relevant content for skill: {skill}")
-            return {
-                "questions": [],
-                "status": "no_content",
-                "error": "Failed to extract content from sources"
-            }
+    # 3. Define Helper for Single Task Execution
+    async def run_single_skill_task(source):
+        skill = source.skill
+        # Context is now handled via file, so we don't need to extract it here
             
-        logging.info(f"  [Step 2] Generating questions for skill: {skill}")
-        logging.info(f"  Source content length: {len(sources_content)} characters")
+        logger.info(f"Creating task for skill: {skill}")
         
-        question_task = tasks.generate_questions_task(
-            question_gen_agent,
-            skill=skill,
-            sources_content=sources_content
+        # Create a specific task for this skill
+        # Note: We manually construct the task description here because the helper 
+        # in tasks.py is designed for the full pipeline (taking only agent).
+        # But we want to test per-skill execution.
+        
+        description = (
+            f"Generate insightful, non-coding interview questions for the skill: '{skill}'. "
+            "You will find the context for this skill in 'app/data/context.json'. "
+            "Use the 'question_generator' tool to generate questions for this specific skill. "
+            "Pass ONLY the skill name to the tool."
         )
         
-        question_crew = Crew(  
-            agents=[question_gen_agent],
-            tasks=[question_task],
-            process=Process.sequential,
+        task = Task(
+            description=description,
+            agent=question_agent,
+            expected_output="A JSON string conforming to the InterviewQuestions schema.",
+        )
+        
+        # Create a temporary Crew for this single task
+        # Note: In a real app, you might add all tasks to one Crew, 
+        # but for maximum control over "per-item" execution as requested, 
+        # running parallel Crews or parallel Tasks is effective.
+        # Here we use a Crew per task to isolate the execution context completely.
+        crew = Crew(
+            agents=[question_agent],
+            tasks=[task],
+            process=Process.sequential, # Sequential within the crew (1 task), but crews run in parallel
             verbose=True
         )
         
-        question_result = await question_crew.kickoff_async()  
-        logging.info(f"  [Step 2 Complete] Questions generated")
-        
         try:
-            parsed_result = AllInterviewQuestions(**json.loads(str(question_result)))
-            questions_list = []
-            for item in parsed_result.all_questions:
-                if item.skill.lower() == skill.lower():
-                    questions_list = item.questions
-                    break
+            # Kickoff async
+            result = await crew.kickoff_async()
             
-            logging.info(f"  Generated {len(questions_list)} questions")
-            for idx, question in enumerate(questions_list[:3], 1):
-                logging.info(f"    {idx}. {question[:80]}..." if len(question) > 80 else f"    {idx}. {question}")
+            # Parse result
+            output_str = ""
+            if hasattr(result, 'raw'):
+                output_str = result.raw
+            else:
+                output_str = str(result)
+                
+            # Parse result
+            output_str = ""
+            if hasattr(result, 'raw'):
+                output_str = result.raw
+            else:
+                output_str = str(result)
+                
+            # Use robust helper to extract JSON from Agent's "Final Answer" text
+            cleaned_output = clean_llm_json_output(output_str)
             
-            return {
-                "questions": questions_list,
-                "status": "success"
-            }
-        except (json.JSONDecodeError, ValueError) as e:
-            logging.warning(f"  Warning: Could not parse questions as AllInterviewQuestions JSON: {e}")
-            logging.debug(f"  Raw result: {question_result}")
-            return {
-                "questions": [],
-                "status": "parse_error",
-                "raw_response": str(question_result)
-            }
+            if not cleaned_output:
+                 logger.error(f"Empty output from agent for {skill}")
+                 logger.error(f"Raw output was: {output_str}")
+                 return InterviewQuestions(skill=skill, questions=[f"Error: Empty agent output. Raw: {output_str[:100]}..."])
 
-    # Run all skill processing concurrently
-    tasks_to_run = [_process_single_skill(skill) for skill in skills_from_agent1]
-    results_from_concurrent_tasks = await asyncio.gather(*tasks_to_run)
+            try:
+                output_data = json.loads(cleaned_output)
+                return InterviewQuestions(**output_data)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON Decode Error for {skill}: {e}")
+                logger.error(f"Raw Output: {output_str}")
+                logger.error(f"Cleaned Output: {cleaned_output}")
+                
+                # Save failing output to file for debugging
+                with open("debug_failed_output.txt", "a", encoding="utf-8") as f:
+                    f.write(f"--- FAILURE FOR {skill} ---\n")
+                    f.write(f"RAW:\n{output_str}\n")
+                    f.write(f"CLEANED:\n{cleaned_output}\n")
+                    f.write("-" * 50 + "\n")
+                
+                raise e
+            
+        except Exception as e:
+            logger.error(f"Failed to generate questions for {skill}: {e}")
+            return InterviewQuestions(skill=skill, questions=[f"Error: {str(e)}"])
 
-    for skill_idx, result_dict in enumerate(results_from_concurrent_tasks):
-        skill = skills_from_agent1[skill_idx]
-        all_questions[skill] = result_dict
+    # 4. Run All Tasks Concurrently (in Batches of 3)
+    logger.info("Kickoff Concurrent Execution (Batch Size: 3)...")
+    start_time = asyncio.get_event_loop().time()
     
-    # Save results to JSON
-    output_data = {
-        "skills": skills_from_agent1,
-        "interview_questions": all_questions,
-        "status": "success"
-    }
+    # Create coroutines for all sources
+    all_coroutines = [run_single_skill_task(source) for source in all_sources.all_sources]
     
-    output_path = "app/tests/agent3_question_generator_output.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(output_data, f, indent=2, ensure_ascii=False)  # type: ignore
-    logging.info(f"\n✓ Result saved to: {output_path}")
+    results = []
+    chunk_size = 3
     
-    # Create a summary version without raw responses
-    output_summary = {
-        "skills": skills_from_agent1,
-        "interview_questions": {
-            skill: {
-                "question_count": len(data.get("questions", [])),
-                "status": data["status"]
-            }
-            for skill, data in all_questions.items()
-        },
-        "total_questions": sum(len(data.get("questions", [])) for data in all_questions.values()),
-        "status": "success"
-    }
+    for i in range(0, len(all_coroutines), chunk_size):
+        chunk = all_coroutines[i:i + chunk_size]
+        logger.info(f"Processing batch {i//chunk_size + 1} of {(len(all_coroutines) + chunk_size - 1) // chunk_size}...")
+        
+        # Run the current chunk concurrently
+        chunk_results = await asyncio.gather(*chunk)
+        results.extend(chunk_results)
+        
+        # Optional: Add a small delay between batches to be extra safe with rate limits
+        if i + chunk_size < len(all_coroutines):
+            await asyncio.sleep(2) 
     
-    output_summary_path = "app/tests/agent3_question_generator_summary.json"
-    with open(output_summary_path, "w", encoding="utf-8") as f:
-        json.dump(output_summary, f, indent=2, ensure_ascii=False)  # type: ignore
-    logging.info(f"✓ Summary saved to: {output_summary_path}")
-    
-    logging.info(f"\n{'='*60}")
-    logging.info(f"Question Generator Agent Test Complete")
-    logging.info(f"{'='*60}\n")
-    
-    return output_summary
+    end_time = asyncio.get_event_loop().time()
+    duration = end_time - start_time
+    logger.info(f"Concurrent execution completed in {duration:.2f} seconds.")
 
+    # 5. Aggregate and Validate Output
+    try:
+        final_output = AllInterviewQuestions(all_questions=list(results))
+        
+        # Verify output file created by task
+        output_file = Path("app/data/interview_questions.json")
+        if output_file.exists():
+             with open(output_file, "r", encoding="utf-8") as f:
+                saved_data = json.load(f)
+                AllInterviewQuestions(**saved_data)
+                logger.info(f"✅ Verified task output file: {output_file}")
+        else:
+             logger.warning(f"⚠️ Task output file not found at {output_file}")
+        
+        logger.info(f"Successfully generated questions for {len(final_output.all_questions)} skills.")
+        for item in final_output.all_questions:
+             logger.info(f"Skill: {item.skill}, Questions: {len(item.questions)}")
+             
+    except Exception as e:
+        logger.error(f"Failed to aggregate results: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    agent1_output_path = str(Path(__file__).parent.parent / "extracted_skills.json")
-    
-    if not os.path.exists(agent1_output_path):
-        logging.error(f"Error: Agent 1 output not found at {agent1_output_path}")
-        logging.error("Please run test_agent_1_resume_analyzer.py first (using hybrid approach)")
-        sys.exit(1)
-    
-    with open(agent1_output_path, "r", encoding="utf-8") as f:
-        agent1_result = json.load(f)
-    
-    skills = agent1_result.get("skills", [])
-    
-    if not skills:
-        logging.error("Error: No skills found in Agent 1 output")
-        sys.exit(1)
-    
-    agent2_output_path_full = str(Path(__file__).parent.parent / "discovered_sources.json")
-    
-    if not os.path.exists(agent2_output_path_full):
-        logging.error(f"Error: Agent 2 output not found at {agent2_output_path_full}")
-        logging.error("Please run test_agent_2_source_discoverer.py first (using hybrid approach)")
-        sys.exit(1)
-    
-    with open(agent2_output_path_full, "r", encoding="utf-8") as f:
-        sources = json.load(f)
-    
-    if not sources:
-        logging.warning("Warning: No sources found in Agent 2 output")
-    
-    result = asyncio.run(test_question_generator_agent(skills, sources))
-    
-    if result:
-        logging.info("\nTest Results Summary (Hybrid Approach):")
-        logging.info(json.dumps(result, indent=2))
+    asyncio.run(test_question_generator_agent_flow())

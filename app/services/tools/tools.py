@@ -22,6 +22,7 @@ from app.schemas.interview import (
 from app.services.tools.llm_config import llm_openrouter
 from app.services.tools.source_discovery import discover_sources
 from app.services.tools.utils import safe_api_call
+from app.services.tools.helpers import optimize_search_query, parse_batch_response, create_fallback_sources, clean_llm_json_output
 import asyncio
 
 
@@ -90,67 +91,109 @@ async def grounded_source_discoverer(skills: List[str]) -> Dict:
 
 
 @tool
-async def question_generator(all_skill_sources_json: str) -> str:
+async def question_generator(skill: str) -> str:
     """
-    Generates interview questions for a batch of skills in parallel.
+    Generates interview questions for a specific skill.
+    The context for the skill is automatically loaded from 'app/data/context.json'.
     
     Args:
-        all_skill_sources_json: A JSON string conforming to the AllSkillSources schema.
+        skill: The technical skill to generate questions for.
         
     Returns:
-        A JSON string conforming to the AllInterviewQuestions schema.
+        A JSON string conforming to the InterviewQuestions schema.
     """
+    import logging
+    import json
+    from pathlib import Path
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Parse input
-        sources_data = json.loads(all_skill_sources_json)
-        all_sources = AllSkillSources(**sources_data)
+        # Load context from file
+        context_file = Path("app/data/context.json")
+        context = ""
         
-        # Define the single question generation function (internal helper)
-        async def generate_single_skill_questions(skill_source) -> InterviewQuestions:
-            skill = skill_source.skill
-            # Extract content from the structured object
-            # Note: extracted_content is now a List[str]
-            if skill_source.extracted_content:
-                context = "\n".join(skill_source.extracted_content)
-            else:
-                context = f"No specific context found for {skill}."
-            
-            prompt = f"""As an expert technical interviewer, your goal is to assess a candidate's deep understanding of "{skill}".
-            
-            Use the provided Context below as a knowledge base (RAG) to ground your questions in relevant topics and terminology.
-            Combine this context with your own expert knowledge to generate insightful, non-coding interview questions that test conceptual depth, problem-solving, and architectural understanding.
-            
-            Context:
-            {context}
-            
-            Respond with a single, valid JSON object with a "questions" key, which is an array of unique strings.
-            """
-            
+        if context_file.exists():
             try:
-                # Use safe_api_call for rate limiting and retries
-                llm_response = await safe_api_call(
-                    llm_openrouter.call,
-                    messages=[{"role": "user", "content": prompt}],
-                    service='openrouter'
-                )
+                with open(context_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    
+                # Find the skill in the data
+                # The data structure matches AllSkillSources: {"all_sources": [{"skill": "...", "extracted_content": [...]}]}
+                all_sources = data.get("all_sources", [])
+                for source in all_sources:
+                    if source.get("skill", "").lower() == skill.lower():
+                        content_list = source.get("extracted_content", [])
+                        context = "\n".join(content_list)
+                        break
                 
-                questions_data = json.loads(llm_response)
-                questions_list = questions_data.get("questions", [])
-                return InterviewQuestions(skill=skill, questions=questions_list)
-                
+                if not context:
+                    logger.warning(f"No context found for skill '{skill}' in {context_file}. Using empty context.")
+                    context = f"No specific context found for {skill}."
+                    
             except Exception as e:
-                logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
-                return InterviewQuestions(skill=skill, questions=[f"Error generating questions: {str(e)}"])
+                logger.error(f"Error reading context file: {e}")
+                context = f"Error reading context file: {e}"
+        else:
+            logger.warning(f"Context file not found at {context_file}. Using empty context.")
+            context = "No context file found."
 
-        # Execute in parallel
-        tasks = [generate_single_skill_questions(source) for source in all_sources.all_sources]
-        results = await asyncio.gather(*tasks)
+        # Get the schema for strict enforcement
+        schema_json = json.dumps(InterviewQuestions.model_json_schema(), indent=2)
+
+        prompt = "\n".join([f"As an expert technical interviewer, your goal is to assess a candidate's deep understanding of {skill}.",    
+        "Use the provided Context below as a knowledge base (RAG) to ground your questions in relevant topics and terminology.",
+        "Combine this context with your own expert knowledge to generate insightful, non-coding interview questions that test conceptual depth, problem-solving, and architectural understanding.",
+        f"""Context: 
+        {context}""",
+        "STRICT OUTPUT FORMAT:",
+        f"""You must respond with a valid JSON object that strictly adheres to the following JSON Schema: 
+        {schema_json}""",
+
+       f"""Example Output: {{
+            "skill": "{skill}",
+            "questions": [
+                "Question 1...",
+                "Question 2..."
+            ]
+        }}""",
+
+        "IMPORTANT: Return ONLY the raw JSON string. Do NOT use markdown code blocks (no backticks). Do NOT add any introductory text."
+        ])
         
-        return AllInterviewQuestions(all_questions=list(results)).json()
+        
+        try:
+            # Use safe_api_call for rate limiting and retries
+            # Wrap synchronous llm_openrouter.call in asyncio.to_thread
+            llm_response = await safe_api_call(
+                asyncio.to_thread,
+                llm_openrouter.call,
+                messages=[{"role": "user", "content": prompt}],
+                service='openrouter'
+            )
+            
+            # Robust parsing using helper
+            cleaned_response = clean_llm_json_output(llm_response)
+            
+            if not cleaned_response:
+                 raise ValueError("LLM returned empty response")
 
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error in batch_question_generator: {e}", exc_info=True)
-        return json.dumps({"error": f"Failed to parse input JSON: {e}"})
+            try:
+                questions_data = json.loads(cleaned_response)
+            except json.JSONDecodeError:
+                logger.error(f"JSON Parsing Failed for '{skill}'.")
+                logger.error(f"Raw LLM Response: {llm_response}")
+                logger.error(f"Cleaned Response: {cleaned_response}")
+                raise # Re-raise to be caught by outer except
+
+            questions_list = questions_data.get("questions", [])
+            return InterviewQuestions(skill=skill, questions=questions_list).model_dump_json()
+            
+        except Exception as e:
+            logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
+            # Include a snippet of the response in the error for debugging
+            debug_info = f"Error: {str(e)}. Response snippet: {llm_response[:200] if 'llm_response' in locals() else 'No response'}"
+            return InterviewQuestions(skill=skill, questions=[debug_info]).model_dump_json()
+
     except Exception as e:
-        logger.error(f"Unexpected error in batch_question_generator: {e}", exc_info=True)
+        logger.error(f"Unexpected error in question_generator: {e}", exc_info=True)
         return json.dumps({"error": f"Unexpected error: {e}"})
