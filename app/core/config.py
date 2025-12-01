@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
+    HF_API_KEY: str = ""
     CREWAI_TELEMETRY_OPT_OUT: bool = True
     REQUESTS_PER_MINUTE: int = 10
     

@@ -61,19 +61,25 @@ class InterviewPrepTasks:
             output_json=AllSkillSources,
             output_file="app/data/context.json" # Save output to file for the next agent
         )
-
     def generate_questions_task(self, agent: Agent) -> Task:
         """
-        Defines the task for generating interview questions.
+        Defines the task for generating interview questions using batch processing.
         """
-        description = ("\n".join(["Generate insightful, non-coding interview questions for the skills identified in the previous task. "
-            "You will find the context for these skills in 'app/data/context.json'. "
-            "For each skill found in the context, use the 'question_generator' tool to generate questions. "
-            "Pass ONLY the skill name to the tool. The tool will automatically load the context from the file."]))
+        description = (
+            "Generate insightful, non-coding interview questions for the following skills: {skills}. "
+            "You have received a list of 'skills' and their 'context'. "
+            "You MUST use the 'batch_question_generator' tool with the EXACT list of skills provided above. "
+            "Do NOT add, remove, or modify any skills. "
+            "The tool will automatically load the context."
+            "IMPORTANT: Your final output must be a VALID JSON object. Use DOUBLE QUOTES for all keys and strings. Do NOT use single quotes."
+            "CRITICAL: Do NOT wrap the output in markdown code blocks (e.g., ```json ... ```). Return ONLY the raw JSON string."
+            "Ensure there are no trailing characters or extra braces at the end of the JSON object."
+        )
         
         return Task(  # type: ignore
             description=description,
             agent=agent,
-            expected_output="A JSON string conforming to the InterviewQuestions schema.",
-            output_file="app/data/interview_questions.json" # Save output to file
+            expected_output="A JSON object conforming to the AllInterviewQuestions schema with all_questions list.",
+            output_file="app/data/interview_questions.json", # Save output to file
+            output_json=AllInterviewQuestions
         )

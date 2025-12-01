@@ -1,0 +1,134 @@
+{
+  "all_questions": [
+    {
+      "skill": "Machine Learning",
+      "questions": [
+        "Can you explain the bias-variance tradeoff in machine learning models, including examples of models that exhibit high bias/low variance and high variance/low bias?",
+        "What techniques would you use to prevent overfitting, and how do they address the bias-variance tradeoff?",
+        "How does the size of the training dataset influence the selection of a machine learning algorithm, and why might simpler models be preferable for smaller datasets?",
+        "Discuss the benefits and trade-offs of ensemble methods, such as improved accuracy versus increased computational cost.",
+        "Describe the key stages in the machine learning model lifecycle, from building to deployment, and highlight the role of hyperparameter tuning in this process.",
+        "Why is accuracy alone insufficient for evaluating model performance on imbalanced datasets? Explain metrics like F1 score, AUC-ROC curve, Gini coefficient, and gain/lift charts.",
+        "How does cross-validation contribute to robust model evaluation and help mitigate overfitting?",
+        "What are the differences between L1 and L2 regularization, and in what scenarios would you choose one over the other?",
+        "What ethical considerations, such as fairness, transparency, and bias mitigation, are critical when developing and deploying machine learning models?",
+        "How can acquiring more diverse training data impact model generalization, and what challenges might arise in doing so?"
+      ]
+    },
+    {
+      "skill": "Deep Learning",
+      "questions": [
+        "Explain the key differences between deep learning and traditional machine learning, focusing on feature learning and the significance of network depth beyond just adding more layers.",
+        "Why are activation functions essential in deep neural networks, and how do they enable the modeling of complex non-linear relationships? Provide examples of common activation functions and their trade-offs.",
+        "Describe the forward and backward propagation processes in a deep neural network, and explain how gradient-based optimizers like Adam update weights and biases to minimize the loss function.",
+        "What is the vanishing gradient problem, and discuss multiple strategies (e.g., activation functions, initialization techniques, normalization methods) to address it in deep networks.",
+        "Compare regularization techniques such as dropout and early stopping: how do they prevent overfitting, and in what scenarios might one be preferred over the other?",
+        "How does data augmentation improve generalization in deep learning models, particularly for vision tasks, and what are some effective augmentation strategies?",
+        "Contrast the architectures of RNNs/LSTMs and Transformers for handling sequential data: what problems do they solve differently, and why have Transformers largely replaced RNNs in many applications?",
+        "Explain the core components and training dynamics of Generative Adversarial Networks (GANs), including the roles of the generator and discriminator, and common challenges like mode collapse.",
+        "When and why is transfer learning particularly beneficial? Describe the process of fine-tuning a pre-trained model and potential pitfalls to avoid."
+      ]
+    },
+    {
+      "skill": "Natural Language Processing (NLP)",
+      "questions": [
+        "Explain the trade-offs between rule-based, statistical, and neural approaches in NLP, and describe a scenario where a rule-based system might outperform a neural model.",
+        "Differentiate between stemming and lemmatization, including their respective strengths and limitations, and discuss when you would choose one over the other in a real-world NLP pipeline.",
+        "How would you preprocess noisy text from social media, including strategies for handling slang, abbreviations, and emojis? What challenges arise and how do they impact downstream tasks?",
+        "Discuss the challenges of data scarcity in low-resource languages and outline augmentation techniques or alternative approaches to build effective NLP models for such languages.",
+        "Compare N-grams with neural language models like LSTMs and Transformers in capturing language dependencies. What are the key limitations of N-grams, and how do attention mechanisms address them?",
+        "Describe the role of morphology and syntax in robust NLP systems. Why might basic tokenization and stop-word removal be insufficient, and how do modern models like BERT incorporate these linguistic aspects?",
+        "Explain how attention mechanisms in models like Transformers improve upon RNNs and LSTMs for tasks such as machine translation. What is self-attention, and why does it enable parallel processing?",
+        "Outline methods to detect and mitigate biases in NLP models, particularly in tasks like sentiment analysis or NER. Why is bias reduction critical, and what trade-offs might you encounter?",
+        "How do supervised and unsupervised learning complement each other in NLP pipelines? Provide examples of tasks where unsupervised pretraining (e.g., via BERT) enhances supervised fine-tuning performance."
+      ]
+    },
+    {
+      "skill": "Computer Vision",
+      "questions": [
+        "Explain the fundamental difference between traditional image processing techniques and modern computer vision approaches, and why the latter enables higher-level tasks like scene understanding.",
+        "How do Convolutional Neural Networks (CNNs) learn spatial hierarchies of features from raw images, and what roles do convolutional layers, pooling layers, and fully connected layers play in this process?",
+        "Compare and contrast hand-engineered feature descriptors like SIFT and HOG with those learned by CNNs. In what scenarios might traditional methods still be preferable?",
+        "Describe the concept of transfer learning in computer vision. Why is fine-tuning a pre-trained model like one trained on ImageNet effective for task-specific datasets, and what are potential pitfalls?",
+        "Differentiate between image classification, object detection, and image segmentation. Provide an example of when each is appropriate and discuss key challenges unique to object detection.",
+        "Walk through the key components of the Faster R-CNN architecture for object detection, including the role of region proposal networks, anchor boxes, and non-maximum suppression (NMS).",
+        "What are anchor boxes in single-shot detectors like YOLO or SSD? How do they facilitate bounding box prediction, and what trade-offs do they introduce?",
+        "Explain the differences between semantic segmentation and instance segmentation. How does Mask R-CNN extend Faster R-CNN to achieve instance segmentation?",
+        "Why is data augmentation crucial in computer vision, especially with limited or imbalanced datasets? Provide specific augmentation techniques and explain how they improve model robustness to real-world variations like lighting or occlusions.",
+        "Discuss evaluation metrics for computer vision tasks beyond accuracy. How is Intersection over Union (IoU) used in detection and segmentation, and what does mean Average Precision (mAP) measure?"
+      ]
+    },
+    {
+      "skill": "Large Language Models (LLMs)",
+      "questions": [
+        "How does the self-attention mechanism in Transformers enable LLMs to capture long-range dependencies more effectively than traditional recurrent models like LSTMs, and what role do positional encodings play in this process?",
+        "Explain the differences between pre-training and fine-tuning in the LLM lifecycle, and why transfer learning makes this approach computationally efficient compared to training from scratch for each task.",
+        "What are the key hyperparameters that influence LLM training stability, such as learning rate schedules and sequence length, and how might you adjust them to address issues like vanishing gradients or overfitting?",
+        "Describe techniques like gradient checkpointing and knowledge distillation, and explain how they help mitigate the memory and computational challenges of training and deploying large-scale LLMs.",
+        "How does in-context learning or few-shot learning work in LLMs, and what advantages does it offer over traditional fine-tuning for adapting to new tasks?",
+        "What strategies would you employ to detect and mitigate biases in LLM outputs, including advanced prompting techniques like Chain-of-Thought self-correction?",
+        "Discuss the challenges of deploying LLMs in production environments, particularly regarding latency, cost, and model monitoring, and propose architectural solutions to address them.",
+        "Why is explainability particularly difficult in LLMs compared to smaller models, and what emerging research areas aim to improve trust in their decision-making processes?",
+        "How do LLMs handle nuances like coherence and context in text generation, and what limitations arise from their permutation-invariant self-attention without positional information?",
+        "Compare the role of dropout and regularization in preventing overfitting during LLM fine-tuning, and how validation metrics guide these decisions."
+      ]
+    },
+    {
+      "skill": "Generative AI",
+      "questions": [
+        "Explain the fundamental difference between generative models and discriminative models in terms of the probability distributions they learn, and why this distinction enables generative models to create novel data.",
+        "Describe the key trade-off between fidelity and diversity in generative models, providing examples from GANs, VAEs, and Diffusion Models.",
+        "What is mode collapse in GANs, and discuss at least two techniques to mitigate it during training?",
+        "Compare the training stability and output quality of VAEs versus GANs, and explain how the explicit latent space in VAEs can be leveraged architecturally.",
+        "Walk through the high-level process of how Diffusion Models generate images, highlighting why they excel in high-fidelity outputs compared to earlier architectures.",
+        "How can generative AI, such as LLMs, be applied to synthetic data augmentation, and what are the potential risks of using such data to train downstream models?",
+        "Discuss the production deployment challenges of generative models, including computational demands, latency, and strategies to address ethical concerns like bias perpetuation.",
+        "In multimodal generative models that combine text and images, how might hybrid approaches integrating generative and discriminative objectives improve performance, and what explainability challenges persist?",
+        "Explain the differences between semantic segmentation and instance segmentation. How does Mask R-CNN extend Faster R-CNN to achieve instance segmentation?"
+      ]
+    },
+    {
+      "skill": "Data Analysis",
+      "questions": [
+        "Explain the importance of understanding the business context and objectives before diving into data analysis. How does this influence the choice of analytical techniques?",
+        "Describe your process for initial data exploration and quality assessment. What specific issues like missing values, inconsistencies, and biases do you prioritize, and why?",
+        "Differentiate between Type I and Type II errors in hypothesis testing. Provide a business scenario where minimizing one over the other would be critical.",
+        "How do you determine if a dataset adheres to a normal distribution, and why is this assumption important for certain statistical tests? What alternatives do you use if it's violated?",
+        "Walk through the bias-variance trade-off in predictive modeling. How do you identify underfitting versus overfitting, and what techniques like resampling do you employ to address it?",
+        "Discuss strategies for handling imbalanced datasets. How do these approaches impact model performance and business decision-making?",
+        "When integrating data from disparate sources, what common challenges like duplicates, spelling errors, and differing representations do you encounter, and what robust wrangling strategies do you apply?",
+        "Outline the iterative nature of data analysis, from hypothesis formulation to validation. How do you incorporate critical thinking to explore alternative explanations for observed patterns?",
+        "How does understanding the data generating process influence your analytical approach? Provide an example where ignoring it could lead to misleading insights.",
+        "Describe how you translate complex statistical findings into actionable business insights, considering trade-offs and potential limitations of the analysis."
+      ]
+    },
+    {
+      "skill": "Data Manipulation & Visualization",
+      "questions": [
+        "Explain the trade-offs between wide and long data formats, including their implications for analysis and visualization tasks.",
+        "Describe strategies for handling missing values, duplicates, and data type conversions in a large dataset, and discuss how these choices impact downstream analysis.",
+        "When would you choose a scatter plot over a histogram or heat map to visualize relationships in data, and what limitations does each have?",
+        "Discuss the performance implications of complex aggregations like GROUP BY with HAVING on large datasets, and outline optimization strategies without relying on specific code.",
+        "How do gestalt principles apply to effective data visualization, and provide examples of how violating them can lead to misinterpretation?",
+        "Explain the concept of progressive disclosure in dashboard design and why it's crucial for balancing detail, clarity, and user experience.",
+        "What are the key considerations for selecting color palettes in visualizations to ensure accessibility and avoid cognitive overload for diverse audiences?",
+        "Articulate the trade-offs between interactivity and performance in visualizations, and describe scenarios where one should be prioritized over the other."
+      ]
+    },
+    {
+      "skill": "API Integration",
+      "questions": [
+        "When would you choose SOAP over REST for an API integration project, and what specific features make it suitable for enterprise environments?",
+        "Describe the trade-offs between real-time integration using webhooks and batch processing for data synchronization, including impacts on data consistency and resource usage.",
+        "Explain the Request-Reply, Fire-and-Forget, and Batch Data Synchronization integration patterns, providing use cases where each excels.",
+        "How would you design a robust error handling strategy for API integrations, incorporating retry mechanisms, circuit breakers, and logging to ensure system reliability?",
+        "What strategies would you employ to manage API rate limits and quotas in a high-volume integration scenario without disrupting service?",
+        "Discuss key security considerations for API integrations beyond authentication, such as protecting against injection attacks, ensuring data encryption, and validating inputs.",
+        "How can caching, payload optimization, and call minimization improve the performance of API integrations, and what pitfalls should be avoided?",
+        "Walk through the OAuth 2.0 authorization flow in the context of integrating with a third-party API, highlighting security implications.",
+        "In a microservices architecture, how would you architect an API gateway to handle multiple external integrations, including versioning and traffic management?",
+        "Describe how to troubleshoot and resolve common API integration issues like 5xx server errors, network latency, or inconsistent data formats from disparate systems."
+      ]
+    }
+  ]
+}

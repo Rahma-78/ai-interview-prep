@@ -3,38 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CrewAI Test UI</title>
-    <style>
-        body { font-family: sans-serif; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        .hidden { display: none; }
-    </style>
+    <title>AI Interview Prep</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <h1>CrewAI Test UI</h1>
-        <form id="upload-form">
-            <input type="file" id="resume" name="resume" accept=".pdf,.docx,.txt">
-            <button type="submit">Generate Questions</button>
-        </form>
-        <div id="results" class="hidden">
-            <h2>Generated Questions</h2>
-            <pre id="questions"></pre>
-        </div>
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-brain"></i>
+                <h1>AI Interview Prep</h1>
+            </div>
+            <p class="subtitle">Upload your resume and get tailored technical interview questions.</p>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <div class="file-drop-area" id="drop-area">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span class="file-msg">Drag & Drop your Resume (PDF) here</span>
+                    <span class="file-or">or</span>
+                    <input class="file-input" type="file" id="resume-file" accept=".pdf" hidden>
+                    <button class="btn-primary" onclick="document.getElementById('resume-file').click()">Browse Files</button>
+                </div>
+                <div id="file-info" class="file-info hidden">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span id="filename">resume.pdf</span>
+                    <i class="fa-solid fa-xmark remove-file" id="remove-file"></i>
+                </div>
+                <button id="analyze-btn" class="btn-analyze hidden">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Questions
+                </button>
+            </section>
+
+            <section id="loading-section" class="loading-section hidden">
+                <div class="loader"></div>
+                <p id="loading-text">Analyzing your resume...</p>
+                <div class="progress-steps">
+                    <div class="step active" id="step-1"><i class="fa-solid fa-check"></i> Extracting Skills</div>
+                    <div class="step" id="step-2"><i class="fa-solid fa-check"></i> Discovering Sources</div>
+                    <div class="step" id="step-3"><i class="fa-solid fa-check"></i> Generating Questions</div>
+                </div>
+            </section>
+
+            <section id="results-section" class="results-section hidden">
+                <h2><i class="fa-solid fa-list-check"></i> Interview Questions</h2>
+                <div id="questions-container" class="questions-container">
+                    <!-- Questions will be injected here -->
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 AI Interview Prep System</p>
+        </footer>
     </div>
-    <script>
-        document.getElementById('upload-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('resume_file', document.getElementById('resume').files[0]);
-            const response = await fetch('/v1/generate-questions/', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            document.getElementById('questions').textContent = JSON.stringify(data, null, 2);
-            document.getElementById('results').classList.remove('hidden');
-        });
-    </script>
+
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

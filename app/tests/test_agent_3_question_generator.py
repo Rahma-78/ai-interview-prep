@@ -1,23 +1,22 @@
 """
 Test script for the Question Generator Agent using the batch_question_generator tool.
-Tests the full Agent -> Task -> Tool flow.
+Tests the full Agent -> Task -> Tool flow with concurrency handled by the tool.
 """
 import asyncio
 import json
 import logging
 import sys
 from pathlib import Path
-from typing import List
 
 from crewai import Crew, Process, Task
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from app.schemas.interview import AllSkillSources, AllInterviewQuestions, InterviewQuestions
+from app.schemas.interview import AllSkillSources, AllInterviewQuestions
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
-from app.services.tools.tools import question_generator
+from app.services.tools.tools import batch_question_generator
 from app.services.tools.helpers import clean_llm_json_output
 
 # Configure logging
@@ -26,10 +25,11 @@ logger = logging.getLogger(__name__)
 
 async def test_question_generator_agent_flow():
     """
-    Tests the Question Generator Agent with real input from discovered_sources.json.
-    Verifies that the Agent correctly calls the question_generator tool for each skill concurrently.
+    Tests the Question Generator Agent with real input from context.json.
+    Verifies that the Agent correctly calls the batch_question_generator tool for concurrent processing.
+    The tool internally uses asyncio.gather() with semaphore (limit=3) for controlled concurrency.
     """
-    logger.info("Starting Question Generator Agent Test (Concurrent Flow)...")
+    logger.info("Starting Question Generator Agent Test (Using Batch Tool with Semaphore)...")
 
     # 1. Load Real Data (Context) from app/data/context.json
     input_path = Path("app/data/context.json")
@@ -54,126 +54,87 @@ async def test_question_generator_agent_flow():
     tasks = InterviewPrepTasks()
     
     tools_dict = {
-        "question_generator": question_generator
+        "batch_question_generator": batch_question_generator
     }
     
-    # Create the agent once (stateless enough for this test)
+    # Create the agent
     question_agent = agents.question_generator_agent(tools_dict)
 
-    # 3. Define Helper for Single Task Execution
-    async def run_single_skill_task(source):
-        skill = source.skill
-        # Context is now handled via file, so we don't need to extract it here
-            
-        logger.info(f"Creating task for skill: {skill}")
-        
-        # Create a specific task for this skill
-        # Note: We manually construct the task description here because the helper 
-        # in tasks.py is designed for the full pipeline (taking only agent).
-        # But we want to test per-skill execution.
-        
-        description = (
-            f"Generate insightful, non-coding interview questions for the skill: '{skill}'. "
-            "You will find the context for this skill in 'app/data/context.json'. "
-            "Use the 'question_generator' tool to generate questions for this specific skill. "
-            "Pass ONLY the skill name to the tool."
-        )
-        
-        task = Task(
-            description=description,
-            agent=question_agent,
-            expected_output="A JSON string conforming to the InterviewQuestions schema.",
-        )
-        
-        # Create a temporary Crew for this single task
-        # Note: In a real app, you might add all tasks to one Crew, 
-        # but for maximum control over "per-item" execution as requested, 
-        # running parallel Crews or parallel Tasks is effective.
-        # Here we use a Crew per task to isolate the execution context completely.
-        crew = Crew(
-            agents=[question_agent],
-            tasks=[task],
-            process=Process.sequential, # Sequential within the crew (1 task), but crews run in parallel
-            verbose=True
-        )
-        
-        try:
-            # Kickoff async
-            result = await crew.kickoff_async()
-            
-            # Parse result
-            output_str = ""
-            if hasattr(result, 'raw'):
-                output_str = result.raw
-            else:
-                output_str = str(result)
-                
-            # Parse result
-            output_str = ""
-            if hasattr(result, 'raw'):
-                output_str = result.raw
-            else:
-                output_str = str(result)
-                
-            # Use robust helper to extract JSON from Agent's "Final Answer" text
-            cleaned_output = clean_llm_json_output(output_str)
-            
-            if not cleaned_output:
-                 logger.error(f"Empty output from agent for {skill}")
-                 logger.error(f"Raw output was: {output_str}")
-                 return InterviewQuestions(skill=skill, questions=[f"Error: Empty agent output. Raw: {output_str[:100]}..."])
-
-            try:
-                output_data = json.loads(cleaned_output)
-                return InterviewQuestions(**output_data)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON Decode Error for {skill}: {e}")
-                logger.error(f"Raw Output: {output_str}")
-                logger.error(f"Cleaned Output: {cleaned_output}")
-                
-                # Save failing output to file for debugging
-                with open("debug_failed_output.txt", "a", encoding="utf-8") as f:
-                    f.write(f"--- FAILURE FOR {skill} ---\n")
-                    f.write(f"RAW:\n{output_str}\n")
-                    f.write(f"CLEANED:\n{cleaned_output}\n")
-                    f.write("-" * 50 + "\n")
-                
-                raise e
-            
-        except Exception as e:
-            logger.error(f"Failed to generate questions for {skill}: {e}")
-            return InterviewQuestions(skill=skill, questions=[f"Error: {str(e)}"])
-
-    # 4. Run All Tasks Concurrently (in Batches of 3)
-    logger.info("Kickoff Concurrent Execution (Batch Size: 3)...")
+    # 3. Extract skills list from the loaded context
+    # This simulates what Agent 2 outputs
+    all_skills = [source.skill for source in all_sources.all_sources]
+    logger.info(f"Input skills from Agent 2 output: {all_skills}")
+    
+    # 4. Create the task (following Agent 2 test pattern)
+    # The task expects to receive context from previous task via CrewAI's context mechanism
+    question_task = tasks.generate_questions_task(question_agent)
+    
+    # 5. Create the crew
+    crew = Crew(
+        agents=[question_agent],
+        tasks=[question_task],
+        process=Process.sequential,
+        verbose=True
+    )
+    
+    # 6. Prepare inputs to pass to crew (simulating Agent 2's output)
+    # In production: This comes from discover_task.output via task.context
+    # In test: We provide it directly via crew inputs
+    inputs = {
+        "context": all_sources.model_dump_json(),  # Pass the full context as JSON string
+        "skills": all_skills  # Also pass just the skill names
+    }
+    
+    # 7. Execute the crew with inputs (following Agent 2 test pattern)
+    logger.info("Kickoff Batch Question Generation (Concurrency controlled by semaphore=3)...")
     start_time = asyncio.get_event_loop().time()
     
-    # Create coroutines for all sources
-    all_coroutines = [run_single_skill_task(source) for source in all_sources.all_sources]
-    
-    results = []
-    chunk_size = 3
-    
-    for i in range(0, len(all_coroutines), chunk_size):
-        chunk = all_coroutines[i:i + chunk_size]
-        logger.info(f"Processing batch {i//chunk_size + 1} of {(len(all_coroutines) + chunk_size - 1) // chunk_size}...")
-        
-        # Run the current chunk concurrently
-        chunk_results = await asyncio.gather(*chunk)
-        results.extend(chunk_results)
-        
-        # Optional: Add a small delay between batches to be extra safe with rate limits
-        if i + chunk_size < len(all_coroutines):
-            await asyncio.sleep(2) 
-    
-    end_time = asyncio.get_event_loop().time()
-    duration = end_time - start_time
-    logger.info(f"Concurrent execution completed in {duration:.2f} seconds.")
-
-    # 5. Aggregate and Validate Output
     try:
-        final_output = AllInterviewQuestions(all_questions=list(results))
+        # Kickoff async with inputs (following Agent 2 test pattern)
+        result = await crew.kickoff_async(inputs=inputs)
         
+        end_time = asyncio.get_event_loop().time()
+        duration = end_time - start_time
+        logger.info(f"Batch execution completed in {duration:.2f} seconds.")
+        
+        # Parse result
+        output_str = ""
+        if hasattr(result, 'raw'):
+            output_str = result.raw
+        else:
+            output_str = str(result)
+            
+        # Use robust helper to extract JSON from Agent's "Final Answer" text
+        cleaned_output = clean_llm_json_output(output_str)
+        
+        if not cleaned_output:
+            logger.error(f"Empty output from agent")
+            logger.error(f"Raw output was: {output_str}")
+            return
+
+        try:
+            output_data = json.loads(cleaned_output)
+            final_output = AllInterviewQuestions(**output_data)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON Decode Error: {e}")
+            logger.error(f"Raw Output: {output_str}")
+            logger.error(f"Cleaned Output: {cleaned_output}")
+            
+            # Save failing output to file for debugging
+            with open("debug_failed_output.txt", "a", encoding="utf-8") as f:
+                f.write(f"--- BATCH FAILURE ---\n")
+                f.write(f"RAW:\n{output_str}\n")
+                f.write(f"CLEANED:\n{cleaned_output}\n")
+                f.write("-" * 50 + "\n")
+            
+            raise e
+        
+    except Exception as e:
+        logger.error(f"Failed to generate questions: {e}", exc_info=True)
+        return
+
+    # 7. Validate Output
+    try:
         # Verify output file created by task
         output_file = Path("app/data/interview_questions.json")
         if output_file.exists():
@@ -186,10 +147,10 @@ async def test_question_generator_agent_flow():
         
         logger.info(f"Successfully generated questions for {len(final_output.all_questions)} skills.")
         for item in final_output.all_questions:
-             logger.info(f"Skill: {item.skill}, Questions: {len(item.questions)}")
+             logger.info(f"  - Skill: {item.skill}, Questions: {len(item.questions)}")
              
     except Exception as e:
-        logger.error(f"Failed to aggregate results: {e}", exc_info=True)
+        logger.error(f"Failed to validate results: {e}", exc_info=True)
 
 if __name__ == "__main__":
     asyncio.run(test_question_generator_agent_flow())

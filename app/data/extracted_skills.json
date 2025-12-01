@@ -2,12 +2,12 @@
   "skills": [
     "Machine Learning",
     "Deep Learning",
-    "Natural Language Processing (NLP)",
+    "Natural Language Processing",
     "Computer Vision",
-    "Large Language Models (LLMs)",
+    "Large Language Models",
     "Generative AI",
     "Data Analysis",
-    "Data Manipulation & Visualization",
-    "API Integration"
+    "Python",
+    "TensorFlow"
   ]
 }

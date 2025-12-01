@@ -29,7 +29,7 @@ llm_gemini = get_llm(
 
 llm_groq = get_llm(
     "groq/llama-3.3-70b-versatile",
-    temperature=0.7,
+    temperature=0.2,
     api_key=settings.GROQ_API_KEY,
     
 )
@@ -42,9 +42,11 @@ llm_openrouter = get_llm(
     extra_body={"include_reasoning": False}
 )
 llm_deepseek = get_llm(
-    "groqllama-3.1-8b-instant",
-    temperature=0.7,
-    api_key=settings.GROQ_API_KEY,
+    "huggingface/deepseek-ai/DeepSeek-R1",
+    temperature=0.2,
+    api_key=settings.HF_API_KEY,
+    
+  
     
 )
 

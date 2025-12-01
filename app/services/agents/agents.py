@@ -78,15 +78,15 @@ class InterviewPrepAgents:
 
     def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:
         """
-        Defines the agent responsible for generating insightful interview questions.
+        Defines the agent responsible for generating insightful interview questions using batch processing.
         """
         return Agent(  # type: ignore
-            role='Question Generator',
-            goal='Generate insightful, non-coding interview questions using provided sources as a knowledge base combined with expert technical knowledge.',
-            backstory='An experienced technical interviewer who uses provided context as a RAG knowledge base to craft challenging, conceptually deep questions.',
-            llm=self.llm_deepseek,  
-            tools=[tools["question_generator"]],
+            role='Batch Question Generator',
+            goal='Generate insightful, non-coding interview questions for multiple skills concurrently using provided sources as a knowledge base combined with expert technical knowledge.',
+            backstory='An experienced technical interviewer who efficiently processes multiple skills using batch operations. Uses provided context as a RAG knowledge base to craft challenging, conceptually deep questions for all skills concurrently.',
+            llm=self.llm_groq,  
+            tools=[tools["batch_question_generator"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            response_format=InterviewQuestions  # Enforce output format
+            response_format=AllInterviewQuestions  # Changed to AllInterviewQuestions
         )

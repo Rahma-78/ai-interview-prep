@@ -5,20 +5,32 @@ import shutil
 import traceback
 from typing import List
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-
-from app.api.deps import get_crew_instance  # Import the dependency
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Form
+from app.api.deps import get_crew_instance
+from app.core.websocket import manager
 from app.schemas.interview import InterviewQuestion
 from app.services.crew.crew import InterviewPrepCrew
 
+from app.core.logger import setup_logger
+
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = setup_logger()
 
 interview_router = APIRouter()
+
+@interview_router.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await manager.connect(websocket, client_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(client_id)
 
 @interview_router.post("/generate-questions/", response_model=List[InterviewQuestion])
 async def generate_interview_questions(
     resume_file: UploadFile = File(...),
+    client_id: str = Form(...),
     crew: InterviewPrepCrew = Depends(get_crew_instance)
 ):
     """
@@ -35,7 +47,7 @@ async def generate_interview_questions(
         HTTPException: If no resume file is provided or an error occurs during processing.
     """
     if not resume_file.filename:
-        logging.error("No resume file provided.")
+        logger.error("No resume file provided.")
         raise HTTPException(status_code=400, detail="No resume file provided.")
 
     file_location = f"temp_{resume_file.filename}"
@@ -45,7 +57,11 @@ async def generate_interview_questions(
         
         crew.file_path = file_location
         
-        result = await crew.run_async()
+        async def progress_callback(message: str):
+            # Message can be a step update ("step_1") or data ("data:{...}")
+            await manager.send_message(message, client_id)
+
+        result = await crew.run_async(progress_callback=progress_callback)
         
         formatted_results: List[InterviewQuestion] = []
         for item in result:
@@ -58,7 +74,7 @@ async def generate_interview_questions(
                     )
                 )
             else:
-                logging.warning(f"Unexpected item in crew result: {item}")
+                logger.warning(f"Unexpected item in crew result: {item}")
                 formatted_results.append(
                     InterviewQuestion(
                         skill="Unknown",
@@ -70,9 +86,9 @@ async def generate_interview_questions(
         return formatted_results
 
     except Exception as e:
-        logging.error(f"Error processing resume: {e}", exc_info=True)
+        logger.error(f"Error processing resume: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing resume: {e}")
     finally:
         if os.path.exists(file_location):
             os.remove(file_location)
-            logging.info(f"Cleaned up temporary file: {file_location}")
+            logger.info(f"Cleaned up temporary file: {file_location}")

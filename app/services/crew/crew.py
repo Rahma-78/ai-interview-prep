@@ -1,24 +1,26 @@
-from __future__ import annotations # Added for postponed evaluation of type annotations
+from __future__ import annotations
 import json
 import logging
 import time
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Callable, Awaitable, Optional
+import asyncio
+from pathlib import Path
 
 from crewai import Crew as CrewAI, Process, Task
 
-from app.schemas.interview import AllInterviewQuestions
+from app.schemas.interview import AllInterviewQuestions, AllSkillSources, SkillSources
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import (
     file_text_extractor,
     grounded_source_discoverer,
-    question_generator,
-   
+    batch_question_generator,
 )
-from app.core.config import settings # Import settings
+from app.core.config import settings
+from app.core.logger import setup_logger, log_async_execution_time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = setup_logger()
 
 class InterviewPrepCrew:
     """
@@ -39,10 +41,10 @@ class InterviewPrepCrew:
         self.tools = {
             "file_text_extractor": file_text_extractor,
             "grounded_source_discoverer": grounded_source_discoverer,
-            "question_generator": question_generator,
+            "batch_question_generator": batch_question_generator,
         }
         self.tasks = InterviewPrepTasks()
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def _create_tasks_with_dependencies(self) -> List[Task]:
         """
@@ -107,45 +109,100 @@ class InterviewPrepCrew:
 
         return formatted_results
 
-    async def run_async(self) -> List[Dict[str, Any]]:
+    @log_async_execution_time
+    async def run_async(self, progress_callback: Optional[Callable[[str], Awaitable[None]]] = None) -> List[Dict[str, Any]]:
         """
-        Run the entire pipeline asynchronously using CrewAI's sequential execution.
-        This implementation uses a single crew with properly defined task dependencies.
-
-        Returns:
-            List of dictionaries containing skills and their associated interview questions
+        Run the pipeline with parallel processing for each skill.
         """
         start_time = time.time()
-
+        
         try:
-            # Create all tasks with their dependencies
-            tasks = self._create_tasks_with_dependencies()
-
-            # Create a single crew with all agents and tasks
-            agents = [task.agent for task in tasks if task.agent is not None]
-            crew = CrewAI(
-                agents=agents,
-                tasks=tasks,
-                process=Process.sequential,
-                verbose=settings.DEBUG_MODE,
-                share_crew=False)
+            # 1. Extract Skills (Sequential)
+            if progress_callback: await progress_callback("step_1")
             
+            resume_analyzer = self.agents.resume_analyzer_agent(self.tools)
+            skills_task = self.tasks.extract_skills_task(resume_analyzer, self.file_path)
+            
+            # Execute skills extraction directly
+            skills_crew = CrewAI(
+                agents=[resume_analyzer],
+                tasks=[skills_task],
+                process=Process.sequential,
+                verbose=settings.DEBUG_MODE
+            )
+            
+            skills_result = await skills_crew.kickoff_async()
+            
+            # Parse skills from result
+            try:
+                skills_data = json.loads(skills_result.raw)
+                skills_list = skills_data.get("skills", [])
+            except Exception as e:
+                self.logger.error(f"Failed to parse skills output: {e}")
+                return []
 
-            # Execute the crew
-            crew_result = await crew.kickoff_async()
+            if not skills_list:
+                self.logger.warning("No skills extracted.")
+                return []
 
-            # Process and format the results
-            formatted_results = self._format_results(crew_result)
+            # 2. Process Skills in Parallel
+            if progress_callback: await progress_callback("step_2")
+            
+            # Import tools directly to use their logic
+            from app.services.tools.source_discovery import discover_sources
+            from app.services.tools.tools import _generate_single_skill_questions
+            
+            # Containers for accumulated data to save to files
+            accumulated_sources: List[SkillSources] = []
+            accumulated_questions: List[Any] = [] # List[InterviewQuestions]
 
-            total_time = time.time() - start_time
-            self.logger.info(f"CrewAI processing completed in {total_time:.3f}s")
-            self.logger.info(f"Total skills with questions: {len(formatted_results)}")
+            async def process_skill(skill: str):
+                try:
+                    # A. Discover Sources
+                    # We call the underlying logic function directly.
+                    # discover_sources is async and returns List[Dict]
+                    sources_list = await discover_sources([skill])
+                    
+                    # Extract context string from the sources and build SkillSources object
+                    context = ""
+                    for source in sources_list:
+                         if "extracted_content" in source:
+                             # extracted_content is a list of strings (paragraphs)
+                             context += "\n".join(source["extracted_content"])
+                             
+                             # Add to accumulated sources
+                             accumulated_sources.append(
+                                 SkillSources(
+                                     skill=skill,
+                                     extracted_content=source["extracted_content"]
+                                 )
+                             )
+                    
+                    # B. Generate Questions
+                    # We use the helper function directly.
+                    # _generate_single_skill_questions is async and returns InterviewQuestions object
+                    questions_obj = await _generate_single_skill_questions(skill, context)
+                    
+                    # Add to accumulated questions
+                    accumulated_questions.append(questions_obj)
+                    
+                    # C. Stream Result
+                    result_dict = {
+                        "skill": questions_obj.skill,
+                        "questions": questions_obj.questions
+                    }
+                    
+                    # Send specific update via callback
+                    if progress_callback:
+                        await progress_callback(f"data:{json.dumps(result_dict)}")
+                        
+                    return result_dict
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing skill {skill}: {e}")
+                    return {"skill": skill, "questions": [], "error": str(e)}
 
-            return formatted_results
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Error parsing CrewAI result as JSON: {e}", exc_info=True)
-            return [{"skill": "Unknown", "questions": [], "error": f"Failed to parse CrewAI result as JSON: {e}"}]
         except Exception as e:
-            self.logger.error(f"Error in CrewAI async run: {e}", exc_info=True)
-            return [{"skill": "Unknown", "questions": [], "error": f"Error in CrewAI processing: {e}"}]
+            self.logger.error(f"Error in run_async: {e}", exc_info=True)
+            return []

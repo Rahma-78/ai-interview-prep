@@ -28,6 +28,9 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+# --- CONFIGURATION ---
+# Limits parallel question generation to avoid rate limits and control concurrency
+MAX_CONCURRENT_QUESTION_GENERATION = 3
 
 # --- CrewAI Tools ---
 
@@ -90,110 +93,145 @@ async def grounded_source_discoverer(skills: List[str]) -> Dict:
 
 
 
-@tool
-async def question_generator(skill: str) -> str:
+
+
+# --- Helper Function for Single Skill Processing ---
+
+async def _generate_single_skill_questions(skill: str, context: str) -> InterviewQuestions:
     """
-    Generates interview questions for a specific skill.
-    The context for the skill is automatically loaded from 'app/data/context.json'.
+    Internal helper function to generate questions for a single skill.
+    Used by batch_question_generator.
     
     Args:
         skill: The technical skill to generate questions for.
+        context: The context string for the skill.
         
     Returns:
-        A JSON string conforming to the InterviewQuestions schema.
+        InterviewQuestions object with skill and questions list.
     """
-    import logging
-    import json
-    from pathlib import Path
-    logger = logging.getLogger(__name__)
-    
     try:
-        # Load context from file
-        context_file = Path("app/data/context.json")
-        context = ""
-        
-        if context_file.exists():
-            try:
-                with open(context_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    
-                # Find the skill in the data
-                # The data structure matches AllSkillSources: {"all_sources": [{"skill": "...", "extracted_content": [...]}]}
-                all_sources = data.get("all_sources", [])
-                for source in all_sources:
-                    if source.get("skill", "").lower() == skill.lower():
-                        content_list = source.get("extracted_content", [])
-                        context = "\n".join(content_list)
-                        break
-                
-                if not context:
-                    logger.warning(f"No context found for skill '{skill}' in {context_file}. Using empty context.")
-                    context = f"No specific context found for {skill}."
-                    
-            except Exception as e:
-                logger.error(f"Error reading context file: {e}")
-                context = f"Error reading context file: {e}"
-        else:
-            logger.warning(f"Context file not found at {context_file}. Using empty context.")
-            context = "No context file found."
+        if not context:
+            logger.warning(f"No context provided for skill '{skill}'. Using empty context.")
+            context = f"No specific context found for {skill}."
 
         # Get the schema for strict enforcement
         schema_json = json.dumps(InterviewQuestions.model_json_schema(), indent=2)
 
-        prompt = "\n".join([f"As an expert technical interviewer, your goal is to assess a candidate's deep understanding of {skill}.",    
-        "Use the provided Context below as a knowledge base (RAG) to ground your questions in relevant topics and terminology.",
-        "Combine this context with your own expert knowledge to generate insightful, non-coding interview questions that test conceptual depth, problem-solving, and architectural understanding.",
-        f"""Context: 
-        {context}""",
-        "STRICT OUTPUT FORMAT:",
-        f"""You must respond with a valid JSON object that strictly adheres to the following JSON Schema: 
-        {schema_json}""",
-
-       f"""Example Output: {{
-            "skill": "{skill}",
-            "questions": [
-                "Question 1...",
-                "Question 2..."
-            ]
-        }}""",
-
-        "IMPORTANT: Return ONLY the raw JSON string. Do NOT use markdown code blocks (no backticks). Do NOT add any introductory text."
+        prompt = "\n".join([
+            f"As an expert technical interviewer, your goal is to assess a candidate's deep understanding of {skill}.",    
+            "Use the provided Context below as a knowledge base (RAG) to ground your questions in relevant topics and terminology.",
+            "Combine this context with your own expert knowledge to generate insightful, non-coding interview questions that test conceptual depth, problem-solving, and architectural understanding.",
+            f"""Context: 
+            {context}""",
+            "STRICT OUTPUT FORMAT:",
+            f"""You must respond with a valid JSON object that strictly adheres to the following JSON Schema: 
+            {schema_json}""",
+            f"""Example Output: {{
+                "skill": "{skill}",
+                "questions": [
+                    "Question 1...",
+                    "Question 2..."
+                ]
+            }}""",
+            "IMPORTANT: Return ONLY the raw JSON string. Do NOT use markdown code blocks (no backticks). Do NOT add any introductory text."
         ])
         
+        # Use safe_api_call for rate limiting and retries
+        llm_response = await safe_api_call(
+            asyncio.to_thread,
+            llm_openrouter.call,
+            messages=[{"role": "user", "content": prompt}],
+            service='openrouter'
+        )
         
+        # Robust parsing using helper
+        cleaned_response = clean_llm_json_output(llm_response)
+        
+        if not cleaned_response:
+            raise ValueError("LLM returned empty response")
+
         try:
-            # Use safe_api_call for rate limiting and retries
-            # Wrap synchronous llm_openrouter.call in asyncio.to_thread
-            llm_response = await safe_api_call(
-                asyncio.to_thread,
-                llm_openrouter.call,
-                messages=[{"role": "user", "content": prompt}],
-                service='openrouter'
-            )
-            
-            # Robust parsing using helper
-            cleaned_response = clean_llm_json_output(llm_response)
-            
-            if not cleaned_response:
-                 raise ValueError("LLM returned empty response")
+            questions_data = json.loads(cleaned_response)
+        except json.JSONDecodeError:
+            logger.error(f"JSON Parsing Failed for '{skill}'.")
+            logger.error(f"Raw LLM Response: {llm_response}")
+            logger.error(f"Cleaned Response: {cleaned_response}")
+            raise
 
-            try:
-                questions_data = json.loads(cleaned_response)
-            except json.JSONDecodeError:
-                logger.error(f"JSON Parsing Failed for '{skill}'.")
-                logger.error(f"Raw LLM Response: {llm_response}")
-                logger.error(f"Cleaned Response: {cleaned_response}")
-                raise # Re-raise to be caught by outer except
-
-            questions_list = questions_data.get("questions", [])
-            return InterviewQuestions(skill=skill, questions=questions_list).model_dump_json()
-            
-        except Exception as e:
-            logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
-            # Include a snippet of the response in the error for debugging
-            debug_info = f"Error: {str(e)}. Response snippet: {llm_response[:200] if 'llm_response' in locals() else 'No response'}"
-            return InterviewQuestions(skill=skill, questions=[debug_info]).model_dump_json()
-
+        questions_list = questions_data.get("questions", [])
+        return InterviewQuestions(skill=skill, questions=questions_list)
+        
     except Exception as e:
-        logger.error(f"Unexpected error in question_generator: {e}", exc_info=True)
-        return json.dumps({"error": f"Unexpected error: {e}"})
+        logger.error(f"Error generating questions for '{skill}': {e}", exc_info=True)
+        # Return error as InterviewQuestions object
+        debug_info = f"Error: {str(e)}. Response snippet: {llm_response[:200] if 'llm_response' in locals() else 'No response'}"
+        return InterviewQuestions(skill=skill, questions=[debug_info])
+
+
+@tool
+async def batch_question_generator(skills: List[str]) -> Dict:
+    """
+    Generates interview questions for multiple skills concurrently with controlled concurrency.
+    Uses asyncio.gather() with a semaphore to limit concurrent API calls.
+    
+    Args:
+        skills: List of technical skills to generate questions for.
+        
+    Returns:
+        A dictionary conforming to AllInterviewQuestions schema with all_questions list.
+    """
+    logger.info(f"Starting batch question generation for {len(skills)} skills with max concurrency: {MAX_CONCURRENT_QUESTION_GENERATION}")
+    
+    # Create semaphore to limit concurrent requests
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_QUESTION_GENERATION)
+    
+    # Load context once
+    context_map = {}
+    try:
+        context_file = Path("app/data/context.json")
+        if context_file.exists():
+            with open(context_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            # Build context map
+            all_sources = data.get("all_sources", [])
+            for source in all_sources:
+                skill_name = source.get("skill", "").lower()
+                content_list = source.get("extracted_content", [])
+                context_map[skill_name] = "\n".join(content_list)
+        else:
+             logger.warning(f"Context file not found at {context_file}.")
+    except Exception as e:
+        logger.error(f"Error reading context file: {e}")
+
+    async def process_single_skill(skill: str) -> InterviewQuestions:
+        """Process a single skill with semaphore control."""
+        async with semaphore:
+            logger.info(f"[Semaphore] Processing skill: {skill}")
+            # Get context for this skill
+            skill_context = context_map.get(skill.lower(), "")
+            result = await _generate_single_skill_questions(skill, skill_context)
+            logger.info(f"[Semaphore] Completed skill: {skill}")
+            return result
+    
+    try:
+        # Process all skills concurrently with semaphore control
+        results = await asyncio.gather(*[process_single_skill(skill) for skill in skills])
+        
+        # Create final output
+        final_output = AllInterviewQuestions(all_questions=list(results))
+        
+        logger.info(f"Successfully generated questions for {len(results)} skills")
+        
+        # Return as dictionary for CrewAI
+        return final_output.model_dump()
+        
+    except Exception as e:
+        logger.error(f"Error in batch question generation: {e}", exc_info=True)
+        # Return partial results or error
+        return {
+            "all_questions": [
+                InterviewQuestions(skill=skill, questions=[f"Error in batch processing: {str(e)}"]).model_dump()
+                for skill in skills
+            ]
+        }
