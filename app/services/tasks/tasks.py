@@ -47,18 +47,22 @@ class InterviewPrepTasks:
         learning resources and provide them as context for the next agent.
         """
       
-        description = ("\n".join(["Find high-quality technical resources for the following skills: {skills}. "
+        description = ("\\n".join(["Find high-quality technical resources for the following skills: {skills}. "
                 "Use the 'grounded_source_discoverer' tool to search for authoritative sources for ALL these skills. "
                 "The tool will batch the searches and return content for each skill. "
-                "CRITICAL: The final output must be a strict JSON object matching the 'AllSkillSources' schema. "
-                "The 'extracted_content' field must contain ONLY the technical summary text that can be used as context for generating interview questions. "
-                "Do NOT include any URLs, links, or 'Sources' sections in the content."]))
+                "CRITICAL OUTPUT FORMAT: You MUST wrap the tool's output in the correct JSON structure: "
+                "{\"all_sources\": [<tool output array>]}. "
+                "The tool returns an array like: [{\"skill\": \"...\", \"extracted_content\": \"...\"},  ...]. "
+                "You must wrap this array under the 'all_sources' key to match the AllSkillSources schema. "
+                "Example: {\"all_sources\": [{\"skill\": \"Python\", \"extracted_content\": \"...\"},  ...]}. "
+                "The 'extracted_content' field must contain ONLY the technical summary text for generating interview questions. "
+                "Do NOT include URLs, links, or 'Sources' sections."]))
                 
 
         return Task(
             description=description,
             agent=agent,
-            expected_output="A JSON object conforming to the AllSkillSources schema, containing the list of skills and their extracted content.",
+            expected_output="A JSON object conforming to the AllSkillSources schema: {\"all_sources\": [{\"skill\": \"...\", \"extracted_content\": \"...\"}]}",
             output_file="app/data/context.json"
     
         )
@@ -71,8 +75,11 @@ class InterviewPrepTasks:
             "You have received a list of 'skills' and their 'context'. "
             "Use the provided context to generate questions for each skill. "
             "IMPORTANT: Your final output must be a VALID JSON object matching the 'AllInterviewQuestions' schema. "
-            "Use DOUBLE QUOTES for all keys and strings. Do NOT use single quotes."
-            "CRITICAL: Do NOT wrap the output in markdown code blocks (e.g., ```json ... ```). Return ONLY the raw JSON string."
+            "CRITICAL FORMAT: The 'questions' field must be an array of PLAIN STRING questions, NOT objects. "
+            "CORRECT: \"questions\": [\"What is...\", \"How does...\"] "
+            "WRONG: \"questions\": [{\"question\": \"What is...\"}, {\"question\": \"How does...\"}] "
+            "Use DOUBLE QUOTES for all keys and strings. Do NOT use single quotes. "
+            "Do NOT wrap the output in markdown code blocks (e.g., ```json ... ```). Return ONLY the raw JSON string. "
             "Ensure the JSON is complete and properly closed with ']}'."
         )
         
@@ -80,5 +87,5 @@ class InterviewPrepTasks:
             description=description,
             agent=agent,
             output_file="app/data/interview_questions.json",
-            expected_output="A JSON object conforming to the AllInterviewQuestions schema with all_questions list.",
+            expected_output="JSON: {\"all_questions\": [{\"skill\": \"...\", \"questions\": [\"question1\", \"question2\", ...]}]}",
         )

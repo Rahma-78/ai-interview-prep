@@ -61,23 +61,43 @@ def log_execution_time(func: Callable[..., Any]) -> Callable[..., Any]:
             raise e
     return wrapper
 
+import inspect
+
 def log_async_execution_time(func: Callable[..., Any]) -> Callable[..., Any]:
     """
-    Decorator to log the execution time of an async function.
+    Decorator to log the execution time of an async function or async generator.
     """
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        start_time = time.time()
-        logger.info(f"Starting async execution of: {func.__name__}")
-        try:
-            result = await func(*args, **kwargs)
-            end_time = time.time()
-            duration = end_time - start_time
-            logger.info(f"Finished async execution of: {func.__name__} in {duration:.4f} seconds")
-            return result
-        except Exception as e:
-            end_time = time.time()
-            duration = end_time - start_time
-            logger.error(f"Error in async {func.__name__} after {duration:.4f} seconds: {str(e)}")
-            raise e
-    return wrapper
+    if inspect.isasyncgenfunction(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.time()
+            logger.info(f"Starting async generator: {func.__name__}")
+            try:
+                async for item in func(*args, **kwargs):
+                    yield item
+                end_time = time.time()
+                duration = end_time - start_time
+                logger.info(f"Finished async generator: {func.__name__} in {duration:.4f} seconds")
+            except Exception as e:
+                end_time = time.time()
+                duration = end_time - start_time
+                logger.error(f"Error in async generator {func.__name__} after {duration:.4f} seconds: {str(e)}")
+                raise e
+        return wrapper
+    else:
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.time()
+            logger.info(f"Starting async execution of: {func.__name__}")
+            try:
+                result = await func(*args, **kwargs)
+                end_time = time.time()
+                duration = end_time - start_time
+                logger.info(f"Finished async execution of: {func.__name__} in {duration:.4f} seconds")
+                return result
+            except Exception as e:
+                end_time = time.time()
+                duration = end_time - start_time
+                logger.error(f"Error in async {func.__name__} after {duration:.4f} seconds: {str(e)}")
+                raise e
+        return wrapper

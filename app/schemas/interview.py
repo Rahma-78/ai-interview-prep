@@ -54,5 +54,6 @@ class InterviewQuestionState(InterviewQuestions):
     Schema for the API response/Frontend state.
     Inherits 'skill' and 'questions' from InterviewQuestions and adds UI state fields.
     """
+    questions: list[str] = Field(default_factory=list, description="A list of technical, interview questions.")
     isLoading: bool = Field(default=False, description="Frontend loading state flag.")
     error: Optional[str] = Field(default=None, description="Error message if generation failed.")

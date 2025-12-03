@@ -38,7 +38,7 @@ class InterviewPrepAgents:
                 "You prioritize skills that enable questions about 'how' and 'why' rather than just 'what'."
             ),
             
-            llm=self.llm_groq,
+            llm=self.llm_openrouter,
             tools=[tools["file_text_extractor"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
@@ -58,7 +58,7 @@ class InterviewPrepAgents:
             role='Expert Research Analyst',
             goal='Find the best text-based web pages with technical resources for specific skills using Gemini\'s native search grounding.',
             backstory=(
-                "You are a world-class digital researcher with access to Gemini\'s native search capabilities. "
+                "You are a world-class digital researcher with access to Gemini's native search capabilities. "
                 "Your goal is to provide the best source material for generating interview questions. "
                 "You MUST rely strictly on the output of the 'grounded_source_discoverer' tool. "
                 "Do not fabricate sources or hallucinate content. If the tool returns few results, work with what is provided."
@@ -70,8 +70,7 @@ class InterviewPrepAgents:
             max_iter=settings.AGENT_MAX_ITER,
             max_rpm=settings.AGENT_MAX_RPM,
             cache=False,
-       
-           
+            response_format=AllSkillSources  # Enforce correct JSON schema
         )
 
 
@@ -89,9 +88,8 @@ class InterviewPrepAgents:
                 "Your expertise lies in crafting challenging, conceptually deep questions that assess a candidate's understanding. "
                 "You use the provided context as a knowledge base combined with your technical expertise to generate questions for ALL skills in each batch."
             ),
-            llm=self.llm_openrouter,  
+            llm=self.llm_deepseek,  
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-           
-         
+            response_format=AllInterviewQuestions  # Enforce correct JSON schema
         )

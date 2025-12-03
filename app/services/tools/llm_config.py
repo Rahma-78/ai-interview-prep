@@ -35,14 +35,22 @@ llm_groq = get_llm(
 )
 
 # DeepSeek via OpenRouter - For question generation (Agent 3)
-llm_openrouter = get_llm(
-    "openrouter/x-ai/grok-4.1-fast:free",
+llm_openrouter =get_llm(
+    "huggingface/meta-llama/Llama-3.3-70B-Instruct",
     temperature=0.2,
-    api_key=settings.OPENROUTER_API_KEY,
-    extra_body={"include_reasoning": False}
+    api_key=settings.HF_API_KEY,
 )
+  
+    
+
+#  get_llm(
+#     "openrouter/meituan/longcat-flash-chat:free",
+#     temperature=0.2,
+#     api_key=settings.OPENROUTER_API_KEY,
+   
+# )
 llm_deepseek = get_llm(
-    "huggingface/deepseek-ai/DeepSeek-R1",
+    "huggingface/openai/gpt-oss-120b",
     temperature=0.2,
     api_key=settings.HF_API_KEY,
     

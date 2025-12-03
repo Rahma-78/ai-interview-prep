@@ -136,12 +136,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Analysis failed');
             }
 
-            const data = await response.json();
+            // Handle NDJSON streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-            // Ensure final step is shown
+            while (true) {
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+                // Decode chunk and add to buffer
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete lines (NDJSON - one JSON object per line)
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const data = JSON.parse(line);
+                            appendResult(data);
+                        } catch (e) {
+                            console.error('Failed to parse line:', line, e);
+                        }
+                    }
+                }
+            }
+
+            // Stream completed successfully
             updateProgress(3);
             setTimeout(() => {
-                displayResults(data);
+                loadingSection.classList.add('hidden');
+                resultsSection.classList.remove('hidden');
+                analyzeBtn.classList.remove('hidden');
+                analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
+                analyzeBtn.onclick = () => {
+                    window.location.reload();
+                }
             }, 500);
 
         } catch (error) {
