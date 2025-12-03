@@ -1,208 +1,338 @@
+"""Main interview preparation crew orchestration."""
+
 from __future__ import annotations
 import json
-import logging
-import time
-from typing import Dict, List, Any, Callable, Awaitable, Optional
 import asyncio
-from pathlib import Path
+from typing import Dict, List, Any, Callable, Awaitable, Optional
+from datetime import datetime
 
-from crewai import Crew as CrewAI, Process, Task
+from crewai import Crew as CrewAI, Process
 
-from app.schemas.interview import AllInterviewQuestions, AllSkillSources, SkillSources
+from app.schemas.interview import (
+    AllInterviewQuestions, 
+    ExtractedSkills, 
+    InterviewQuestions
+)
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
 from app.services.tools.tools import (
     file_text_extractor,
     grounded_source_discoverer,
-    batch_question_generator,
 )
+from app.services.tools.helpers import clean_llm_json_output
 from app.core.config import settings
 from app.core.logger import setup_logger, log_async_execution_time
 
-# Configure logging
+# Import our modular components
+from .history_manager import HistoryManager
+from .file_validator import FileValidator
+from .run_metadata import RunMetadata
+
 logger = setup_logger()
+
 
 class InterviewPrepCrew:
     """
-    A professional implementation of an interview preparation pipeline using CrewAI.
-    This class orchestrates the process of extracting skills from a resume,
-    finding relevant sources, and generating interview questions.
+    Orchestrates interview preparation pipeline using CrewAI.
+    
+    Architecture:
+    - Uses composition over inheritance
+    - Delegates responsibilities to specialized classes
+    - Follows SOLID principles
+    - Each method has single, clear purpose
+    
+    Dependencies (injected via composition):
+    - HistoryManager: Manages data persistence
+    - FileValidator: Validates input files
+    - RunMetadata: Tracks run statistics
+    - InterviewPrepAgents: Provides AI agents
+    - InterviewPrepTasks: Defines tasks
     """
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, validate: bool = True):
         """
-        Initialize the InterviewPrepCrew with the path to the resume file.
+        Initialize the crew.
 
         Args:
-            file_path: Path to the resume file to be processed
+            file_path: Path to resume file
+            validate: Whether to validate file immediately
         """
         self.file_path = file_path
+        self.logger = logger
+        
+        # Inject dependencies (Dependency Injection pattern)
+        self.validator = FileValidator(logger)
+        self.history = HistoryManager(logger=logger)
         self.agents = InterviewPrepAgents()
+        self.tasks = InterviewPrepTasks()
         self.tools = {
             "file_text_extractor": file_text_extractor,
             "grounded_source_discoverer": grounded_source_discoverer,
-            "batch_question_generator": batch_question_generator,
         }
-        self.tasks = InterviewPrepTasks()
-        self.logger = logger
-
-    def _create_tasks_with_dependencies(self) -> List[Task]:
-        """
-        Create all tasks with proper dependencies between them.
-
-        Returns:
-            List of tasks with their dependencies properly configured
-        """
-        # Create agents - each agent is specialized for a specific role
-        resume_analyzer = self.agents.resume_analyzer_agent(self.tools)
-        source_discoverer = self.agents.source_discoverer_agent(self.tools)
-        question_generator_agent = self.agents.question_generator_agent(self.tools)
-
-        # Create the first task - extract skills from resume
-        # This task processes the resume file and extracts technical skills
-        skills_task = self.tasks.extract_skills_task(resume_analyzer, self.file_path)
-
-        # Create the second task - discover sources based on skills
-        # This task uses the skills extracted from the previous task to find relevant sources
-        # Note: We do not pass 'skills' explicitly; CrewAI passes the output of skills_task via context.
-        discover_task = self.tasks.discover_and_extract_content_task(
-            source_discoverer
-        )
-
-        # Create the third task - generate questions based on skills and sources
-        # This task uses both the extracted skills and discovered sources to generate questions
-        question_task = self.tasks.generate_questions_task(
-            question_generator_agent
-        )
-
-        # Set up task dependencies - CrewAI will automatically pass outputs
-        # This creates a pipeline: skills_task → discover_task → question_task
-        discover_task.context = [skills_task]
-        question_task.context = [skills_task, discover_task]
-
-        return [skills_task, discover_task, question_task]
-
-    def _format_results(self, crew_result) -> List[Dict[str, Any]]:
-        """
-        Format and validate the crew results.
-
-        Args:
-            crew_result: The result from the crew execution
-
-        Returns:
-            Formatted list of skills and questions
-
-        Raises:
-            json.JSONDecodeError: If the result cannot be parsed as JSON
-            Exception: If the result doesn't match the expected schema
-        """
-        # The crew_result object's .raw attribute contains the raw JSON string output
-        result_data = json.loads(crew_result.raw)
-        parsed_result = AllInterviewQuestions(**result_data)
-
-        formatted_results = []
-        for item in parsed_result.all_questions:
-            formatted_results.append({
-                "skill": item.skill,
-                "questions": item.questions
-            })
-
-        return formatted_results
-
-    @log_async_execution_time
-    async def run_async(self, progress_callback: Optional[Callable[[str], Awaitable[None]]] = None) -> List[Dict[str, Any]]:
-        """
-        Run the pipeline with parallel processing for each skill.
-        """
-        start_time = time.time()
         
+        # Validate if requested
+        if validate:
+            self.validator.validate(file_path)
+
+    async def _extract_skills(
+        self, 
+        metadata: RunMetadata,
+        progress_callback: Optional[Callable[[str], Awaitable[None]]]
+    ) -> List[str]:
+        """
+        Extract skills from resume.
+        
+        Args:
+            metadata: Run metadata to update
+            progress_callback: Optional progress callback
+            
+        Returns:
+            List of extracted skills
+            
+        Raises:
+            Exception: If skill extraction fails
+        """
+        if progress_callback:
+            await progress_callback("step_1_extraction")
+        
+        # Create crew
+        agent = self.agents.resume_analyzer_agent(self.tools)
+        task = self.tasks.extract_skills_task(agent, self.file_path)
+        
+        crew = CrewAI(
+            agents=[agent],
+            tasks=[task],
+            process=Process.sequential,
+            verbose=settings.DEBUG_MODE
+        )
+        
+        # Execute
+        result = await crew.kickoff_async()
+        
+        # Parse and validate
         try:
-            # 1. Extract Skills (Sequential)
-            if progress_callback: await progress_callback("step_1")
+            extracted = ExtractedSkills(**result.json_dict)
+            skills_list = extracted.skills
             
-            resume_analyzer = self.agents.resume_analyzer_agent(self.tools)
-            skills_task = self.tasks.extract_skills_task(resume_analyzer, self.file_path)
-            
-            # Execute skills extraction directly
-            skills_crew = CrewAI(
-                agents=[resume_analyzer],
-                tasks=[skills_task],
-                process=Process.sequential,
-                verbose=settings.DEBUG_MODE
-            )
-            
-            skills_result = await skills_crew.kickoff_async()
-            
-            # Parse skills from result
-            try:
-                skills_data = json.loads(skills_result.raw)
-                skills_list = skills_data.get("skills", [])
-            except Exception as e:
-                self.logger.error(f"Failed to parse skills output: {e}")
-                return []
-
             if not skills_list:
-                self.logger.warning("No skills extracted.")
-                return []
-
-            # 2. Process Skills in Parallel
-            if progress_callback: await progress_callback("step_2")
+                raise ValueError("No skills extracted")
             
-            # Import tools directly to use their logic
-            from app.services.tools.source_discovery import discover_sources
-            from app.services.tools.tools import _generate_single_skill_questions
+            metadata.skill_count = len(skills_list)
+            self.logger.info(f"Extracted {len(skills_list)} skills: {skills_list}")
             
-            # Containers for accumulated data to save to files
-            accumulated_sources: List[SkillSources] = []
-            accumulated_questions: List[Any] = [] # List[InterviewQuestions]
+            # Save to history
+            self.history.save(extracted.dict(), "extracted_skills.json", metadata.run_id)
+            
+            if progress_callback:
+                await progress_callback(f"step_1_complete:{len(skills_list)}")
+            
+            return skills_list
+            
+        except Exception as e:
+            self.logger.error(f"Failed to parse skills: {e}")
+            metadata.add_error("extraction", str(e))
+            metadata.mark_failed()
+            raise
 
-            async def process_skill(skill: str):
-                try:
-                    # A. Discover Sources
-                    # We call the underlying logic function directly.
-                    # discover_sources is async and returns List[Dict]
-                    sources_list = await discover_sources([skill])
-                    
-                    # Extract context string from the sources and build SkillSources object
-                    context = ""
-                    for source in sources_list:
-                         if "extracted_content" in source:
-                             # extracted_content is a list of strings (paragraphs)
-                             context += "\n".join(source["extracted_content"])
-                             
-                             # Add to accumulated sources
-                             accumulated_sources.append(
-                                 SkillSources(
-                                     skill=skill,
-                                     extracted_content=source["extracted_content"]
-                                 )
-                             )
-                    
-                    # B. Generate Questions
-                    # We use the helper function directly.
-                    # _generate_single_skill_questions is async and returns InterviewQuestions object
-                    questions_obj = await _generate_single_skill_questions(skill, context)
-                    
-                    # Add to accumulated questions
-                    accumulated_questions.append(questions_obj)
-                    
-                    # C. Stream Result
+    async def _process_batch(
+        self,
+        batch_skills: List[str],
+        batch_num: int,
+        total_batches: int,
+        semaphore: asyncio.Semaphore,
+        metadata: RunMetadata,
+        progress_callback: Optional[Callable[[str], Awaitable[None]]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Process a single batch of skills.
+        
+        Args:
+            batch_skills: Skills in this batch
+            batch_num: Batch number (0-indexed)
+            total_batches: Total number of batches
+            semaphore: Concurrency control semaphore
+            metadata: Run metadata to update
+            progress_callback: Optional progress callback
+            
+        Returns:
+            List of results for each skill in batch
+        """
+        async with semaphore:
+            self.logger.info(f"Batch {batch_num + 1}/{total_batches}: {batch_skills}")
+            
+            try:
+                # Create agents and tasks
+                source_agent = self.agents.source_discoverer_agent(self.tools)
+                question_agent = self.agents.question_generator_agent(self.tools)
+                
+                discover_task = self.tasks.discover_sources_task(source_agent, batch_skills)
+                question_task = self.tasks.generate_questions_task(question_agent)
+                question_task.context = [discover_task]
+                
+                # Execute batch crew
+                batch_crew = CrewAI(
+                    agents=[source_agent, question_agent],
+                    tasks=[discover_task, question_task],
+                    process=Process.sequential,
+                    verbose=settings.DEBUG_MODE
+                )
+                
+                result = await batch_crew.kickoff_async(inputs={"skills": batch_skills})
+                
+                # Parse result
+                output_str = result.raw if hasattr(result, 'raw') else str(result)
+                cleaned_output = clean_llm_json_output(output_str)
+                
+                if not cleaned_output:
+                    raise ValueError("Empty output from agent")
+                
+                output_data = json.loads(cleaned_output)
+                questions_obj = AllInterviewQuestions(**output_data)
+                
+                # Stream results immediately
+                batch_results = []
+                for item in questions_obj.all_questions:
                     result_dict = {
-                        "skill": questions_obj.skill,
-                        "questions": questions_obj.questions
+                        "skill": item.skill,
+                        "questions": item.questions
                     }
+                    batch_results.append(result_dict)
                     
-                    # Send specific update via callback
+                    # IMMEDIATE streaming - user sees results right away
                     if progress_callback:
                         await progress_callback(f"data:{json.dumps(result_dict)}")
-                        
-                    return result_dict
-                    
-                except Exception as e:
-                    self.logger.error(f"Error processing skill {skill}: {e}")
-                    return {"skill": skill, "questions": [], "error": str(e)}
+                
+                metadata.increment_success()
+                self.logger.info(f"Batch {batch_num + 1} completed: {len(batch_results)} skills")
+                
+                if progress_callback:
+                    await progress_callback(f"step_2_batch_complete:{batch_num + 1}")
+                
+                return batch_results
+                
+            except Exception as e:
+                self.logger.error(f"Batch {batch_num + 1} error: {e}", exc_info=True)
+                metadata.increment_failure()
+                metadata.add_error(f"batch_{batch_num + 1}", str(e), batch_skills)
+                return [{"skill": skill, "questions": [], "error": str(e)} for skill in batch_skills]
 
+    async def _process_batches(
+        self,
+        skills: List[str],
+        metadata: RunMetadata,
+        progress_callback: Optional[Callable[[str], Awaitable[None]]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Process all skill batches in parallel.
+        
+        Args:
+            skills: List of all skills to process
+            metadata: Run metadata to update
+            progress_callback: Optional progress callback
+            
+        Returns:
+            Flattened list of all results
+        """
+        # Create batches
+        batches = [
+            skills[i:i + settings.BATCH_SIZE] 
+            for i in range(0, len(skills), settings.BATCH_SIZE)
+        ]
+        metadata.batch_count = len(batches)
+        
+        self.logger.info(
+            f"Processing {len(skills)} skills in {len(batches)} batches "
+            f"(batch_size={settings.BATCH_SIZE}, max_concurrent={settings.MAX_CONCURRENT_BATCHES})"
+        )
+        
+        if progress_callback:
+            await progress_callback(f"step_2_batch_start:0,{len(batches)}")
+        
+        # Process batches with semaphore for concurrency control
+        semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_BATCHES)
+        
+        tasks = [
+            self._process_batch(batch, idx, len(batches), semaphore, metadata, progress_callback)
+            for idx, batch in enumerate(batches)
+        ]
+        
+        results_nested = await asyncio.gather(*tasks)
+        
+        # Flatten results
+        return [item for sublist in results_nested for item in sublist]
 
+    @log_async_execution_time
+    async def run_async(
+        self, 
+        progress_callback: Optional[Callable[[str], Awaitable[None]]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Run the interview preparation pipeline.
+        
+        Pipeline stages:
+        1. Validation & Cleanup
+        2. Skill Extraction
+        3. Batch Processing (source discovery + question generation)
+        4. Finalization & Save
+        
+        Args:
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            List of interview questions per skill
+        """
+        # Initialize run
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        metadata = RunMetadata(run_id)
+        
+        try:
+            # Step 0: Validation & Cleanup
+            self.validator.validate(self.file_path)
+            self.history.clear_all()
+            
+            if progress_callback:
+                await progress_callback("step_0_validation")
+            
+            # Step 1: Extract Skills
+            skills = await self._extract_skills(metadata, progress_callback)
+            
+            # Step 2: Process Batches
+            results = await self._process_batches(skills, metadata, progress_callback)
+            
+            # Step 3: Finalization
+            if progress_callback:
+                await progress_callback("step_3_finalization")
+            
+            # Save final results
+            all_questions = AllInterviewQuestions(
+                all_questions=[
+                    InterviewQuestions(skill=r["skill"], questions=r.get("questions", []))
+                    for r in results if "skill" in r
+                ]
+            )
+            
+            self.history.save(all_questions.dict(), "interview_questions.json", run_id)
+            
+            # Save metadata
+            metadata.mark_success()
+            self.history.save(metadata.to_dict(), "run_metadata.json", run_id)
+            
+            if progress_callback:
+                await progress_callback("step_3_complete")
+            
+            self.logger.info(
+                f"Pipeline completed: {metadata.batches_succeeded}/{metadata.batch_count} batches succeeded, "
+                f"{metadata.batches_failed} failed, duration: {metadata.to_dict()['duration_seconds']}s"
+            )
+            
+            return results
+            
         except Exception as e:
-            self.logger.error(f"Error in run_async: {e}", exc_info=True)
+            self.logger.error(f"Fatal error: {e}", exc_info=True)
+            metadata.add_error("pipeline", str(e))
+            metadata.mark_failed()
+            
+            # Save error metadata
+            self.history.save(metadata.to_dict(), "run_metadata.json", run_id)
+            
             return []

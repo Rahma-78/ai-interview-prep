@@ -1,6 +1,8 @@
 import logging
 from typing import Optional, Dict, List, Any
 import re
+import json
+import json_repair
 from app.schemas.interview import AllSkillSources, SkillSources
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,7 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
         
         results_map[skill]["content"] = body_text
         results_map[skill]["found"] = True
-
+    
     # Convert map to list, maintaining original order
     for skill in skills:
         data = results_map[skill]
@@ -144,38 +146,27 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
 
     return final_output
 
-
-def clean_llm_json_output(text: str) -> str:
+def clean_llm_json_output(raw_text: str) -> str:
     """
-    Robustly extracts JSON object from LLM response using Regex.
-    Handles markdown code blocks, text prefixes/suffixes, and whitespace.
+    Cleans LLM output to extract valid JSON using json_repair.
     """
-    if not text:
+    if not raw_text:
         return ""
         
-    # 1. Try to find JSON inside markdown code blocks
-    markdown_pattern = r"```(?:json)?\s*(\{.*?\})\s*```"
-    match = re.search(markdown_pattern, text, re.DOTALL | re.IGNORECASE)
-    if match:
-        return match.group(1)
-
-    # 2. If no markdown, try to find the first outer-most JSON object
-    # This looks for the first '{' and the last '}'
-    start_idx = text.find('{')
-    end_idx = text.rfind('}')
+    # Remove markdown code blocks first
+    text = re.sub(r'```json\s*', '', raw_text)
+    text = re.sub(r'```', '', text)
     
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        return text[start_idx : end_idx + 1]
-
-    # 3. Fallback: Return original text (stripped) if no pattern matches
-    # Try to strip common prefixes/suffixes if regex failed
-    text = text.strip()
-    
-    # Remove "**Final Answer**:" or "Final Answer:" prefixes
-    text = re.sub(r"^\**Final Answer\**:\s*", "", text, flags=re.IGNORECASE).strip()
-    
-    # Remove leading/trailing backticks if present (e.g. `{"foo": "bar"}`)
-    if text.startswith("`") and text.endswith("`"):
-        text = text[1:-1].strip()
-        
-    return text
+    try:
+        # Use json_repair to fix malformed JSON
+        decoded_object = json_repair.loads(text)
+        # Convert back to string for Pydantic validation
+        return json.dumps(decoded_object)
+    except Exception as e:
+        logger.error(f"Failed to repair JSON: {e}")
+        # Fallback to simple extraction if repair fails
+        start_idx = text.find('{')
+        end_idx = text.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            return text[start_idx:end_idx+1]
+        return text.strip()

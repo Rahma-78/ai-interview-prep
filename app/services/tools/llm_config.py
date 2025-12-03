@@ -37,7 +37,7 @@ llm_groq = get_llm(
 # DeepSeek via OpenRouter - For question generation (Agent 3)
 llm_openrouter = get_llm(
     "openrouter/x-ai/grok-4.1-fast:free",
-    temperature=0.7,
+    temperature=0.2,
     api_key=settings.OPENROUTER_API_KEY,
     extra_body={"include_reasoning": False}
 )

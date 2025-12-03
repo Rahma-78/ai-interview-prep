@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.schemas.interview import AllSkillSources, AllInterviewQuestions
 from app.services.agents.agents import InterviewPrepAgents
 from app.services.tasks.tasks import InterviewPrepTasks
-from app.services.tools.tools import batch_question_generator
+from app.services.tools.tools import file_text_extractor
 from app.services.tools.helpers import clean_llm_json_output
 
 # Configure logging
@@ -53,9 +53,7 @@ async def test_question_generator_agent_flow():
     agents = InterviewPrepAgents()
     tasks = InterviewPrepTasks()
     
-    tools_dict = {
-        "batch_question_generator": batch_question_generator
-    }
+    tools_dict = {}
     
     # Create the agent
     question_agent = agents.question_generator_agent(tools_dict)
@@ -100,8 +98,10 @@ async def test_question_generator_agent_flow():
         # Parse result
         output_str = ""
         if hasattr(result, 'raw'):
+            logger.info("Using result.raw for output string extraction.")
             output_str = result.raw
         else:
+            logger.info("result.raw not found. Using str(result) for output string extraction.")
             output_str = str(result)
             
         # Use robust helper to extract JSON from Agent's "Final Answer" text

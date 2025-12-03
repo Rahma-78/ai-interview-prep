@@ -3,11 +3,7 @@ from typing import List, Dict, Callable
 
 from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills, InterviewQuestions
 from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
-from app.core.config import settings # Import settings
-
-# ============================================================================
-# SESSION CACHE FOR OPTIMIZATION
-# ============================================================================
+from app.core.config import settings
 
 class InterviewPrepAgents:
     """
@@ -32,7 +28,7 @@ class InterviewPrepAgents:
         return Agent( 
             role="Expert technical skill extraction agent",
             goal=(
-                "Extract exactly 9 high-impact technical skills from the resume that are ideal for verbal technical interviews. "
+                f"Extract exactly {settings.SKILL_COUNT} high-impact technical skills from the resume that are ideal for verbal technical interviews. "
                 "Focus on core competencies, architectural concepts, and design principles."
             ),
             backstory=(
@@ -44,12 +40,12 @@ class InterviewPrepAgents:
             
             llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
-            verbose=settings.DEBUG_MODE,  # Reduce verbose output to improve performance
+            verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            max_iter=settings.AGENT_MAX_ITER,  # Limit iterations to reduce latency
-            max_rpm=settings.AGENT_MAX_RPM,  # Increase requests per minute for faster processing
-            memory=False,  # Disable memory to reduce overhead
-            cache=False,  # Disable caching for faster first call
+            max_iter=settings.AGENT_MAX_ITER,
+            max_rpm=settings.AGENT_MAX_RPM,
+            memory=False,
+            cache=False,
 
          )
 
@@ -73,20 +69,26 @@ class InterviewPrepAgents:
             max_iter=settings.AGENT_MAX_ITER,
             max_rpm=settings.AGENT_MAX_RPM,
             cache=False,
-            response_format=AllSkillSources  # Enforce output format
+           
         )
+
 
     def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:
         """
-        Defines the agent responsible for generating insightful interview questions using batch processing.
+        Defines the agent responsible for generating insightful interview questions.
+        Receives batched context from source discoverer and generates questions for all skills in the batch.
         """
         return Agent(  # type: ignore
             role='Batch Question Generator',
-            goal='Generate insightful, non-coding interview questions for multiple skills concurrently using provided sources as a knowledge base combined with expert technical knowledge.',
-            backstory='An experienced technical interviewer who efficiently processes multiple skills using batch operations. Uses provided context as a RAG knowledge base to craft challenging, conceptually deep questions for all skills concurrently.',
-            llm=self.llm_groq,  
-            tools=[tools["batch_question_generator"]],
+            goal=f'Generate insightful, non-coding interview questions for batches of skills (typically {settings.BATCH_SIZE} skills per batch) using provided context.',
+            backstory=(
+                "You are an experienced technical interviewer who efficiently processes batches of skills in parallel workflows. "
+                "You receive context from the source discovery phase containing technical content for multiple skills. "
+                "Your expertise lies in crafting challenging, conceptually deep questions that assess a candidate's understanding. "
+                "You use the provided context as a knowledge base combined with your technical expertise to generate questions for ALL skills in each batch."
+            ),
+            llm=self.llm_openrouter,  
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            response_format=AllInterviewQuestions  # Changed to AllInterviewQuestions
+         
         )

@@ -15,7 +15,7 @@ langchain-mistralai
 langchain-google-genai
 langchain-openrouter
 httpx
-
+json_repair
 pypdf
 
 

@@ -5,20 +5,15 @@ from app.core.config import settings
 def get_crew_instance() -> Generator[InterviewPrepCrew, None, None]:
     """
     Dependency for providing an InterviewPrepCrew instance.
-    In a real application, this might handle database sessions,
-    external API clients, etc.
+    Creates crew without validation since file_path will be set later in the endpoint.
     """
-    # For now, we'll just yield a new instance.
-    # In a more complex setup, you might manage a pool or
-    # inject specific configurations.
-    crew = None # Initialize crew to None
+    crew = None
     try:
-        crew = InterviewPrepCrew(file_path="temp_resume.pdf") # Placeholder file_path
+        # Create crew without validation since file_path will be set later
+        crew = InterviewPrepCrew(file_path="", validate=False)
         yield crew
     finally:
         # No specific cleanup needed for InterviewPrepCrew at this time.
-        # If resources (e.g., temporary files) were managed by the crew itself,
-        # their cleanup would be handled internally by the crew's methods.
         pass
 
 # Example of another dependency (if needed)

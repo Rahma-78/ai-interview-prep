@@ -1,32 +1,58 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Union, Optional
+from typing import Optional
+
+# --- Shared/Base Models ---
+
+class SkillBasedModel(BaseModel):
+    """Base model for any entity related to a specific technical skill."""
+    skill: str = Field(
+        ..., 
+        description="The specific technical skill (e.g., 'Python', 'Kubernetes', 'React')."
+    )
+
+# --- Agent/LLM Extraction Models ---
 
 class ExtractedSkills(BaseModel):
-    skills: List[str] = Field(description="A list of technical skills found in the resume.")
+    """Schema for the initial extraction of skills from a resume."""
+    skills: list[str] = Field(
+        ..., 
+        description="A list of distinct technical hard skills found in the text. Exclude soft skills."
+    )
 
-class SkillSources(BaseModel):
-    """
-    Represents the discovered sources for a specific technical skill.
-    """
-    skill: str = Field(description="The technical skill (e.g., 'Python', 'Machine Learning').")
-    extracted_content: List[str] = Field(description="A list of comprehensive technical summaries and potential interview angles extracted from sources.")
+class SkillSources(SkillBasedModel):
+    """Schema for web search results and summaries linked to a skill."""
+    extracted_content: list[str] = Field(
+        ..., 
+        description="A list of technical summaries, documentation snippets, or interview angles derived from web sources."
+    )
 
 class AllSkillSources(BaseModel):
-    all_sources: List[SkillSources] = Field(description="A list of all skills with their summaries.")
+    """Collection wrapper for skill sources."""
+    all_sources: list[SkillSources] = Field(
+        ..., 
+        description="A collection of sources and summaries for multiple skills."
+    )
 
-class InterviewQuestions(BaseModel):
-    skill: str = Field(description="The technical skill.")
-    questions: List[str] = Field(description="A list of insightful interview questions for this skill.")
+class InterviewQuestions(SkillBasedModel):
+    """Schema for generating interview questions for a specific skill."""
+    questions: list[str] = Field(
+        ..., 
+        description="A list of 3-5 technical, scenario-based interview questions testing depth of knowledge."
+    )
 
 class AllInterviewQuestions(BaseModel):
-    all_questions: List[InterviewQuestions] = Field(description="A list of all skills with their generated questions.")
+    """Collection wrapper for interview questions."""
+    all_questions: list[InterviewQuestions] = Field(
+        ..., 
+        description="A complete list of interview questions grouped by skill."
+    )
 
-class InterviewQuestion(BaseModel):
+# --- Frontend/API State Models ---
+
+class InterviewQuestionState(InterviewQuestions):
     """
-    Schema for the API response, representing questions for a single skill.
-    Includes frontend-specific fields like isLoading.
+    Schema for the API response/Frontend state.
+    Inherits 'skill' and 'questions' from InterviewQuestions and adds UI state fields.
     """
-    skill: str
-    questions: List[str] = []
-    isLoading: bool = False
-    error: Optional[str] = None
+    isLoading: bool = Field(default=False, description="Frontend loading state flag.")
+    error: Optional[str] = Field(default=None, description="Error message if generation failed.")

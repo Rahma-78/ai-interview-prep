@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +37,10 @@ app.include_router(interview_router, prefix="/api/v1", tags=["interview"])
 @app.get("/")
 async def read_root():
     return FileResponse('app/templates/index.html')
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse('app/static/favicon.ico') if (static_dir / "favicon.ico").exists() else Response(status_code=204)
 
 @app.on_event("startup")
 async def startup_event():

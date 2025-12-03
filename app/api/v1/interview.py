@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Form
 from app.api.deps import get_crew_instance
 from app.core.websocket import manager
-from app.schemas.interview import InterviewQuestion
+from app.schemas.interview import InterviewQuestionState
 from app.services.crew.crew import InterviewPrepCrew
 
 from app.core.logger import setup_logger
@@ -27,7 +27,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except WebSocketDisconnect:
         manager.disconnect(client_id)
 
-@interview_router.post("/generate-questions/", response_model=List[InterviewQuestion])
+@interview_router.post("/generate-questions/", response_model=List[InterviewQuestionState])
 async def generate_interview_questions(
     resume_file: UploadFile = File(...),
     client_id: str = Form(...),
@@ -41,7 +41,7 @@ async def generate_interview_questions(
         crew (InterviewPrepCrew): The CrewAI instance for generating questions.
 
     Returns:
-        List[InterviewQuestion]: A list of generated interview questions.
+        List[InterviewQuestionState]: A list of generated interview questions.
 
     Raises:
         HTTPException: If no resume file is provided or an error occurs during processing.
@@ -63,11 +63,11 @@ async def generate_interview_questions(
 
         result = await crew.run_async(progress_callback=progress_callback)
         
-        formatted_results: List[InterviewQuestion] = []
+        formatted_results: List[InterviewQuestionState] = []
         for item in result:
             if isinstance(item, dict) and "skill" in item and "questions" in item:
                 formatted_results.append(
-                    InterviewQuestion(
+                    InterviewQuestionState(
                         skill=item["skill"],
                         questions=item["questions"],
                         isLoading=False
@@ -76,7 +76,7 @@ async def generate_interview_questions(
             else:
                 logger.warning(f"Unexpected item in crew result: {item}")
                 formatted_results.append(
-                    InterviewQuestion(
+                    InterviewQuestionState(
                         skill="Unknown",
                         error="Failed to parse questions from AI crew.",
                         isLoading=False

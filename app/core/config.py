@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL_UTILS: str = "INFO"
     
+    # Pipeline Configuration
+    SKILL_COUNT: int = 9
+    BATCH_SIZE: int = 3
+    MAX_CONCURRENT_BATCHES: int = 3
+    
+    # Data History Configuration
+    ENABLE_DATA_HISTORY: bool = True
+    DATA_RETENTION_DAYS: int = 30
+    
 
 # Initialize settings and validate API keys
 settings = Settings()
