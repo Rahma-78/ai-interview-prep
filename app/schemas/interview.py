@@ -21,7 +21,7 @@ class ExtractedSkills(BaseModel):
 
 class SkillSources(SkillBasedModel):
     """Schema for web search results and summaries linked to a skill."""
-    extracted_content: list[str] = Field(
+    extracted_content: str = Field(
         ..., 
         description="A list of technical summaries, documentation snippets, or interview angles derived from web sources."
     )
@@ -37,7 +37,7 @@ class InterviewQuestions(SkillBasedModel):
     """Schema for generating interview questions for a specific skill."""
     questions: list[str] = Field(
         ..., 
-        description="A list of 3-5 technical, scenario-based interview questions testing depth of knowledge."
+        description="A list of technical, interview questions."
     )
 
 class AllInterviewQuestions(BaseModel):

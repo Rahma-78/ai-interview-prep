@@ -20,7 +20,7 @@ def create_fallback_sources(
     
     return {
         "skill": skill,
-        "extracted_content": [content_msg],
+        "extracted_content": content_msg,
     }
 
 
@@ -132,7 +132,7 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
         if data["found"]:
             final_output.append({
                 "skill": skill,
-                "extracted_content": [data["content"]],
+                "extracted_content": data["content"],
             })
             if data["source_count"] > 0:
                 logger.info(f"Skill '{skill}' synthesized from {data['source_count']} sources.")
@@ -141,7 +141,7 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
             logger.warning(f"Parser could not find section for '{skill}'")
             final_output.append({
                 "skill": skill,
-                "extracted_content": [f"AI failed to structure response for {skill}."]
+                "extracted_content": f"AI failed to structure response for {skill}."
             })
 
     return final_output

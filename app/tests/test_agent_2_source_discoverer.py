@@ -41,7 +41,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     
     # Ensure the tool is correctly mapped
     tools = {
-        "grounded_source_discoverer": grounded_source_discoverer
+       "grounded_source_discoverer": grounded_source_discoverer
     }
     
     source_discoverer = agents.source_discoverer_agent(tools)
@@ -51,7 +51,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
     logging.info("=" * 80)
 
     # Pass skills explicitly in the inputs
-    discover_task = tasks.discover_and_extract_content_task(source_discoverer, skills=skills_from_agent1)
+    discover_task = tasks.discover_sources_task(source_discoverer, skills=skills_from_agent1)
     
     search_crew = CrewAI(
         agents=[source_discoverer],

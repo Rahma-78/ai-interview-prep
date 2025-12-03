@@ -37,7 +37,7 @@ class InterviewPrepTasks:
                     "Critical Requirement: Skills must be suitable for generating non-coding interview questions, focusing on substantive technical knowledge."])),
             agent=agent,
             expected_output=f"JSON object with 'skills' key containing {settings.SKILL_COUNT} specific, technical skill strings relevant to the candidate's background.",   
-            output_json=ExtractedSkills
+            output_file="app/data/extracted_skills.json"
         )
 
     def discover_sources_task(self, agent: Agent, skills: List[str] = None) -> Task:
@@ -53,12 +53,13 @@ class InterviewPrepTasks:
                 "CRITICAL: The final output must be a strict JSON object matching the 'AllSkillSources' schema. "
                 "The 'extracted_content' field must contain ONLY the technical summary text that can be used as context for generating interview questions. "
                 "Do NOT include any URLs, links, or 'Sources' sections in the content."]))
+                
 
         return Task(
             description=description,
             agent=agent,
             expected_output="A JSON object conforming to the AllSkillSources schema, containing the list of skills and their extracted content.",
-            output_json=AllSkillSources,
+            output_file="app/data/context.json"
     
         )
     def generate_questions_task(self, agent: Agent, skills: List[str] = None) -> Task:
@@ -70,7 +71,6 @@ class InterviewPrepTasks:
             "You have received a list of 'skills' and their 'context'. "
             "Use the provided context to generate questions for each skill. "
             "IMPORTANT: Your final output must be a VALID JSON object matching the 'AllInterviewQuestions' schema. "
-            "The structure should be: {\"all_questions\": [{\"skill\": \"Skill Name\", \"questions\": [\"Q1\", \"Q2\", \"Q3\",..]}, ...]}"
             "Use DOUBLE QUOTES for all keys and strings. Do NOT use single quotes."
             "CRITICAL: Do NOT wrap the output in markdown code blocks (e.g., ```json ... ```). Return ONLY the raw JSON string."
             "Ensure the JSON is complete and properly closed with ']}'."
@@ -79,5 +79,6 @@ class InterviewPrepTasks:
         return Task(  # type: ignore
             description=description,
             agent=agent,
+            output_file="app/data/interview_questions.json",
             expected_output="A JSON object conforming to the AllInterviewQuestions schema with all_questions list.",
         )

@@ -46,6 +46,7 @@ class InterviewPrepAgents:
             max_rpm=settings.AGENT_MAX_RPM,
             memory=False,
             cache=False,
+         
 
          )
 
@@ -69,6 +70,7 @@ class InterviewPrepAgents:
             max_iter=settings.AGENT_MAX_ITER,
             max_rpm=settings.AGENT_MAX_RPM,
             cache=False,
+       
            
         )
 
@@ -90,5 +92,6 @@ class InterviewPrepAgents:
             llm=self.llm_openrouter,  
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
+           
          
         )
