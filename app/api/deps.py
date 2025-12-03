@@ -1,5 +1,5 @@
 from typing import Generator
-from app.services.crew.crew import InterviewPrepCrew
+from app.services.crew.interview_crew import InterviewPrepCrew
 from app.core.config import settings
 
 def get_crew_instance() -> Generator[InterviewPrepCrew, None, None]:

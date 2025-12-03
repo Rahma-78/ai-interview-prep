@@ -12,7 +12,7 @@ from starlette.background import BackgroundTask
 from app.api.deps import get_crew_instance
 from app.core.websocket import manager
 from app.schemas.interview import InterviewQuestionState
-from app.services.crew.crew import InterviewPrepCrew
+from app.services.crew.interview_crew import InterviewPrepCrew
 
 from app.core.logger import setup_logger
 
