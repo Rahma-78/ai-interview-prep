@@ -71,30 +71,33 @@ async def generate_interview_questions(
                 # Step 3: Create crew (without re-validation)
                 crew = InterviewPrepCrew(file_path=file_location, validate=False)
                 
-                # Progress callback for WebSocket updates
-                async def progress_callback(message: str):
-                    if not message.startswith("data:"):
-                        await manager.send_message(f"STATUS: {message}", client_id)
-                
-                # Step 4: Process and get results
-                results = await crew.run_async(progress_callback=progress_callback)
-                
-                # Step 5: Stream results as NDJSON
-                for result_data in results:
-                    if "error" in result_data:
-                        error_data = InterviewQuestionState(
-                            skill=result_data["skill"],
-                            error=result_data.get("error", "Unknown error"),
-                            isLoading=False
-                        ).model_dump()
-                        yield json.dumps(error_data) + "\n"
-                    elif "skill" in result_data and "questions" in result_data:
+                # Step 4: Process and get results via async generator
+                async for event in crew.run_async_generator():
+                    if event["type"] == "status":
+                        # Send status updates via WebSocket
+                        await manager.send_message(event["content"], client_id)
+                    
+                    elif event["type"] == "data":
+                        # Stream data results as NDJSON
+                        result_data = event["content"]
                         data = InterviewQuestionState(
                             skill=result_data["skill"],
                             questions=result_data["questions"],
                             isLoading=False
                         ).model_dump()
                         yield json.dumps(data) + "\n"
+                    
+                    elif event["type"] == "error":
+                        # Stream error results as NDJSON
+                        error_data = event["content"]
+                        data = InterviewQuestionState(
+                            skill=error_data.get("skill", "Error"),
+                            error=error_data.get("error", "Unknown error"),
+                            isLoading=False
+                        ).model_dump()
+                        data_str = json.dumps(data)
+                        logger.debug(f"Yielding data: {data_str[:100]}...")
+                        yield data_str + "\n"
                 
             except Exception as e:
                 logger.error(f"Error in response generator: {e}", exc_info=True)

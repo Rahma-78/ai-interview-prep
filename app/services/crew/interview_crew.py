@@ -64,12 +64,14 @@ class InterviewPrepCrew:
             self.file_validator.validate(self.file_path)
 
     @log_async_execution_time
-    async def run_async(self, progress_callback: Optional[Callable[[str], Awaitable[None]]] = None) -> List[Dict[str, Any]]:
+    async def run_async_generator(self):
         """
         Run the pipeline with parallel processing for batches of skills using dedicated mini-crews.
-
-        Uses separate semaphores for source discovery and question generation to allow
-        concurrent execution across different batches and improve throughput.
+        Yields events as they happen for true streaming.
+        
+        Yields:
+            Dict[str, Any]: Event dictionary with 'type' and 'content'.
+            Types: 'status', 'data', 'error'
         """
         start_time = time.time()
 
@@ -77,7 +79,7 @@ class InterviewPrepCrew:
             # ---------------------------------------------------------
             # 1. Extract Skills (Sequential)
             # ---------------------------------------------------------
-            if progress_callback: await progress_callback("step_1")
+            yield {"type": "status", "content": "step_1"}
 
             resume_analyzer = self.agents.resume_analyzer_agent(self.tools)
             skills_task = self.tasks.extract_skills_task(resume_analyzer, self.file_path)
@@ -102,12 +104,12 @@ class InterviewPrepCrew:
 
             if not skills_list:
                 self.logger.warning("No skills extracted.")
-                return []
+                return
 
             # ---------------------------------------------------------
             # 2. Process Skills in Batches (Mini-Crews with Granular Locking)
             # ---------------------------------------------------------
-            if progress_callback: await progress_callback("step_2")
+            yield {"type": "status", "content": "step_2"}
 
             # Chunk skills into batches of 3 to optimize source discovery
             BATCH_SIZE = 3
@@ -121,13 +123,6 @@ class InterviewPrepCrew:
             async def process_batch_crew(batch_skills: List[str]):
                 """
                 Process a single batch with granular locking.
-
-                Splits processing into two phases:
-                1. Source Discovery - holds source_sem only during API call
-                2. Question Generation - holds question_sem only during API call
-
-                This allows source discovery and question generation to run
-                concurrently across different batches, improving throughput by ~30-40%.
                 """
                 try:
                     formatted_skills = ", ".join(batch_skills)
@@ -194,11 +189,7 @@ class InterviewPrepCrew:
                                 "questions": item.questions
                             }
                             batch_results.append(result_dict)
-
-                            if progress_callback:
-                                # Send specific update via callback
-                                await progress_callback(f"data:{json.dumps(result_dict)}")
-
+                    
                     return batch_results
 
                 except Exception as e:
@@ -206,17 +197,28 @@ class InterviewPrepCrew:
                     # Return error structure so we don't lose data for other batches
                     return [{"skill": skill, "questions": [], "error": str(e)} for skill in batch_skills]
 
-            # Run all mini-crews in parallel (controlled by separate semaphores)
-            results_nested = await asyncio.gather(*[process_batch_crew(batch) for batch in skill_batches])
+            # Create tasks for all batches
+            tasks = [process_batch_crew(batch) for batch in skill_batches]
+            
+            # Yield step 3 status before starting to yield results
+            yield {"type": "status", "content": "step_3"}
 
-            # Flatten results
-            final_results = [item for sublist in results_nested for item in sublist]
-
-            return final_results
+            # Process batches as they complete
+            for future in asyncio.as_completed(tasks):
+                try:
+                    batch_results = await future
+                    for result in batch_results:
+                        if "error" in result:
+                            yield {"type": "error", "content": result}
+                        else:
+                            yield {"type": "data", "content": result}
+                except Exception as e:
+                    self.logger.error(f"Error in batch execution: {e}", exc_info=True)
+                    yield {"type": "error", "content": {"error": str(e)}}
 
         except Exception as e:
-            self.logger.error(f"Error in run_async: {e}", exc_info=True)
-            return []
+            self.logger.error(f"Error in run_async_generator: {e}", exc_info=True)
+            yield {"type": "error", "content": {"error": str(e)}}
 
     def _parse_crew_result(
         self,

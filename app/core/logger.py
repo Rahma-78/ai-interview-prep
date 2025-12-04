@@ -5,13 +5,41 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable, Any
 
+from logging.handlers import RotatingFileHandler
+import os
+
 # Create logs directory if it doesn't exist
-LOGS_DIR = Path("logs")
+# Use absolute path to ensure logs are always written to the project root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
+
+class ColorFormatter(logging.Formatter):
+    """Custom formatter to add colors to console output."""
+    
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+    FORMATS = {
+        logging.DEBUG: grey + format_str + reset,
+        logging.INFO: grey + format_str + reset,
+        logging.WARNING: yellow + format_str + reset,
+        logging.ERROR: red + format_str + reset,
+        logging.CRITICAL: bold_red + format_str + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
+        return formatter.format(record)
 
 def setup_logger(name: str = "ai_interview_prep", log_level: int = logging.INFO) -> logging.Logger:
     """
-    Sets up a logger with console and file handlers.
+    Sets up a logger with console (colored) and file (rotating) handlers.
     """
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
@@ -20,20 +48,23 @@ def setup_logger(name: str = "ai_interview_prep", log_level: int = logging.INFO)
     if logger.hasHandlers():
         return logger
 
-    # Formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-    # Console Handler
+    # Console Handler with Colors
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(ColorFormatter())
     logger.addHandler(console_handler)
 
-    # File Handler
-    file_handler = logging.FileHandler(LOGS_DIR / "app.log", encoding="utf-8")
-    file_handler.setFormatter(formatter)
+    # File Handler with Rotation
+    # Rotate after 5MB, keep 5 backup files
+    file_handler = RotatingFileHandler(
+        LOGS_DIR / "app.log", 
+        maxBytes=5*1024*1024, 
+        backupCount=5, 
+        encoding="utf-8"
+    )
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    ))
     logger.addHandler(file_handler)
 
     return logger

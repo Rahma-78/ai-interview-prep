@@ -22,22 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ws.onmessage = (event) => {
         const message = event.data;
-        if (message.startsWith('data:')) {
-            const jsonStr = message.substring(5);
-            try {
-                const data = JSON.parse(jsonStr);
-                appendResult(data);
-            } catch (e) {
-                console.error("Failed to parse data message", e);
-            }
-        } else if (message === 'step_1') {
+        if (message === 'step_1') {
             updateProgress(1);
         } else if (message === 'step_2') {
             updateProgress(2);
-            // Show results section immediately so we can stream into it
-            loadingSection.classList.add('hidden');
-            resultsSection.classList.remove('hidden');
-            analyzeBtn.classList.remove('hidden');
+            updateProgress(2);
+            // Keep loading section visible during search
+            // We will switch to results when the first data chunk arrives
         } else if (message === 'step_3') {
             updateProgress(3);
         }
@@ -155,11 +146,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 for (const line of lines) {
                     if (line.trim()) {
-                        try {
-                            const data = JSON.parse(line);
-                            appendResult(data);
-                        } catch (e) {
-                            console.error('Failed to parse line:', line, e);
+                        // Robust parsing for potentially concatenated JSON objects (e.g., {...}{...})
+                        let remaining = line.trim();
+                        while (remaining) {
+                            try {
+                                // Try parsing the whole thing first
+                                const data = JSON.parse(remaining);
+                                appendResult(data);
+                                remaining = ''; // Done
+                            } catch (e) {
+                                // If it fails, it might be multiple objects concatenated
+                                // Try to find the first valid JSON object
+                                let found = false;
+                                for (let i = 1; i < remaining.length; i++) {
+                                    if (remaining[i] === '}') {
+                                        const potential = remaining.substring(0, i + 1);
+                                        try {
+                                            const data = JSON.parse(potential);
+                                            appendResult(data);
+                                            remaining = remaining.substring(i + 1).trim();
+                                            found = true;
+                                            break;
+                                        } catch (err) {
+                                            // Not a valid object yet, continue
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    console.error('Failed to parse line segment:', remaining);
+                                    console.warn('Full buffer content:', JSON.stringify(buffer));
+                                    remaining = ''; // Stop infinite loop
+                                }
+                            }
                         }
                     }
                 }
@@ -172,6 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultsSection.classList.remove('hidden');
                 analyzeBtn.classList.remove('hidden');
                 analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
+
+                // Clear current file so the main click listener returns early
+                currentFile = null;
+
                 analyzeBtn.onclick = () => {
                     window.location.reload();
                 }
@@ -210,20 +232,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function displayResults(data) {
-        // This might be called with the full list at the end, 
-        // but we are already streaming. We can ignore it or use it to ensure completeness.
-        // For now, let's just ensure the UI is in the right state.
-        loadingSection.classList.add('hidden');
-        resultsSection.classList.remove('hidden');
-        analyzeBtn.classList.remove('hidden');
-        analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
-        analyzeBtn.onclick = () => {
-            window.location.reload();
-        }
-    }
-
     function appendResult(item) {
+        // Show results section when the first data arrives
+        if (resultsSection.classList.contains('hidden')) {
+            loadingSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            analyzeBtn.classList.remove('hidden');
+        }
+
         // Check if already exists (optional, but good for safety)
 
         const card = document.createElement('div');

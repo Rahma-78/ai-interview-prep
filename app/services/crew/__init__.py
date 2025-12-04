@@ -10,7 +10,7 @@ Architecture:
 All modules follow SOLID principles for maintainability and testability.
 """
 
-from .crew import InterviewPrepCrew
+from .interview_crew import InterviewPrepCrew
 from .file_validator import FileValidator
 
 __all__ = [

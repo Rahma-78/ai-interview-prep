@@ -36,7 +36,14 @@ app.include_router(interview_router, prefix="/api/v1", tags=["interview"])
 
 @app.get("/")
 async def read_root():
-    return FileResponse('app/templates/index.html')
+    import time
+    from fastapi.responses import HTMLResponse
+    with open('app/templates/index.html', 'r', encoding='utf-8') as f:
+        content = f.read()
+    # Dynamic cache busting: replace the static version with current timestamp
+    # This ensures the browser always loads the latest JS in development
+    content = content.replace('app.js?v=2', f'app.js?v={int(time.time())}')
+    return HTMLResponse(content)
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
