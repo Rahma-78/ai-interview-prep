@@ -3,7 +3,7 @@ from typing import Optional, Dict, List, Any
 import re
 import json
 import json_repair
-from app.schemas.interview import AllSkillSources, SkillSources
+
 
 logger = logging.getLogger(__name__)
 

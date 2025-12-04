@@ -37,7 +37,7 @@ class ColorFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
-def setup_logger(name: str = "ai_interview_prep", log_level: int = logging.INFO) -> logging.Logger:
+def setup_logger(name: str = "app", log_level: int = logging.INFO) -> logging.Logger:
     """
     Sets up a logger with console (colored) and file (rotating) handlers.
     """
@@ -69,7 +69,10 @@ def setup_logger(name: str = "ai_interview_prep", log_level: int = logging.INFO)
 
     return logger
 
-logger = setup_logger()
+# Initialize logger for decorators
+logger = logging.getLogger(__name__)
+
+
 
 def log_execution_time(func: Callable[..., Any]) -> Callable[..., Any]:
     """

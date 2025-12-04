@@ -13,7 +13,7 @@ from google.api_core.exceptions import (
     TooManyRequests,
 )
 
-from app.services.tools.llm_config import get_genai_client, GEMINI_MODEL
+from app.core.llm import get_genai_client, GEMINI_MODEL
 from app.services.tools.helpers import optimize_search_query, parse_batch_response, create_fallback_sources
 from app.services.tools.utils import safe_api_call
 

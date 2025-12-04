@@ -24,10 +24,10 @@ from app.services.tools.tools import (
 from app.services.tools.helpers import clean_llm_json_output
 from app.services.crew.file_validator import FileValidator
 from app.core.config import settings
-from app.core.logger import setup_logger, log_async_execution_time
+from app.core.logger import log_async_execution_time
 
 # Configure logging
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 class InterviewPrepCrew:
     """

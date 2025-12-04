@@ -1,21 +1,33 @@
-from fastapi import FastAPI, Response
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Response, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-
 from app.api.v1.interview import interview_router
-from app.core.config import settings
 from app.core.logger import setup_logger
+from app.core.exceptions import global_exception_handler, http_exception_handler
 
 # Setup logger
-logger = setup_logger()
+setup_logger()
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Application startup: AI Interview Prep System")
+    yield
+    logger.info("Application shutdown")
 
 app = FastAPI(
     title="AI Interview Prep",
     description="AI-powered interview preparation system.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
+
+app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 
 # CORS configuration
 app.add_middleware(
@@ -48,11 +60,3 @@ async def read_root():
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse('app/static/favicon.ico') if (static_dir / "favicon.ico").exists() else Response(status_code=204)
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Application startup: AI Interview Prep System")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Application shutdown")

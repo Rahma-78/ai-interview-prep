@@ -9,15 +9,13 @@ from typing import List
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Form
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
-from app.api.deps import get_crew_instance
+from app.api.deps import get_crew_factory
 from app.core.websocket import manager
 from app.schemas.interview import InterviewQuestionState
 from app.services.crew.interview_crew import InterviewPrepCrew
 
-from app.core.logger import setup_logger
-
 # Configure logging
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 interview_router = APIRouter()
 
@@ -33,7 +31,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 @interview_router.post("/generate-questions/")
 async def generate_interview_questions(
     resume_file: UploadFile = File(...),
-    client_id: str = Form(...)
+    client_id: str = Form(...),
+    crew_factory = Depends(get_crew_factory)
 ):
     """
     Generates interview questions based on an uploaded resume file.
@@ -69,7 +68,7 @@ async def generate_interview_questions(
             """Generator that creates crew, processes, and ensures cleanup."""
             try:
                 # Step 3: Create crew (without re-validation)
-                crew = InterviewPrepCrew(file_path=file_location, validate=False)
+                crew = crew_factory(file_location)
                 
                 # Step 4: Process and get results via async generator
                 async for event in crew.run_async_generator():

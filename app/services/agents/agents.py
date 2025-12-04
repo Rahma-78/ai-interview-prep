@@ -2,7 +2,7 @@ from crewai import Agent
 from typing import List, Dict, Callable
 
 from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills, InterviewQuestions
-from app.services.tools.llm_config import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
+from app.core.llm import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
 from app.core.config import settings
 
 class InterviewPrepAgents:

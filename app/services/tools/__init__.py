@@ -3,7 +3,7 @@ from .tools import (
     file_text_extractor,
     grounded_source_discoverer,
 )
-from .llm_config import llm_gemini, llm_groq, llm_openrouter,llm_deepseek
+from app.core.llm import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
 from .helpers import create_fallback_sources, optimize_search_query, parse_batch_response,clean_llm_json_output
 
 # Export utilities for rate limiting and retry logic

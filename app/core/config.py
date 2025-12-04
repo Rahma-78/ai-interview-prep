@@ -2,11 +2,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
 
-# --- Start Diagnostics ---
+
 
 # 2. Get the path to the .env file
 CONFIG_DIR = Path(__file__).resolve().parent
-ENV_FILE_PATH = CONFIG_DIR / '.env'
+# Assuming .env is in the project root (two levels up from app/core)
+PROJECT_ROOT = CONFIG_DIR.parent.parent
+ENV_FILE_PATH = PROJECT_ROOT / '.env'
 
 # Load environment variables from .env file
 load_dotenv(ENV_FILE_PATH)
@@ -20,14 +22,13 @@ class Settings(BaseSettings):
     )
 
    
-    DEBUG_MODE: bool = ""
+    DEBUG_MODE: bool = False
    
 
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
     HF_API_KEY: str = ""
-    CREWAI_TELEMETRY_OPT_OUT: bool = True
     REQUESTS_PER_MINUTE: int = 10
     
     # Service Specific Limits (Requests Per Minute)
@@ -49,17 +50,11 @@ class Settings(BaseSettings):
     RETRY_FAIL_FAST_MAX_RETRIES: int = 1
     RETRY_FAIL_FAST_MAX_DELAY: float = 5.0
     RETRY_FAIL_FAST_MIN_QUOTA_DELAY: float = 3.0
-    
-    # Logging
-    LOG_LEVEL_UTILS: str = "INFO"
-    
+   
     # Pipeline Configuration
     SKILL_COUNT: int = 9
     BATCH_SIZE: int = 3
-    MAX_CONCURRENT_BATCHES: int = 3
-    
- 
-    
+
 
 # Initialize settings and validate API keys
 settings = Settings()
