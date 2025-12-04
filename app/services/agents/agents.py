@@ -45,9 +45,6 @@ class InterviewPrepAgents:
             max_iter=settings.AGENT_MAX_ITER,
             max_rpm=settings.AGENT_MAX_RPM,
             memory=False,
-            cache=False,
-         
-
          )
 
     def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:

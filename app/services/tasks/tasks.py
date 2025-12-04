@@ -72,7 +72,7 @@ class InterviewPrepTasks:
         """
         description = (
             "Generate insightful, non-coding interview questions for the following skills: {skills}. "
-            "You have received a list of 'skills' and their 'context'. "
+            "You have received a list of 'skills' and their 'context': {context}. "
             "Use the provided context to generate questions for each skill. "
             "IMPORTANT: Your final output must be a VALID JSON object matching the 'AllInterviewQuestions' schema. "
             "CRITICAL FORMAT: The 'questions' field must be an array of PLAIN STRING questions, NOT objects. "

@@ -57,7 +57,7 @@ async def test_source_discoverer_agent(skills_from_agent1: list):
         agents=[source_discoverer],
         tasks=[discover_task],
         process=Process.sequential,
-        verbose=False 
+        verbose=True
     )
     
     inputs = {"skills": skills_from_agent1}

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     )
 
    
-    DEBUG_MODE: bool = False
+    DEBUG_MODE: bool = ""
    
 
     GEMINI_API_KEY: str = ""
@@ -58,9 +58,7 @@ class Settings(BaseSettings):
     BATCH_SIZE: int = 3
     MAX_CONCURRENT_BATCHES: int = 3
     
-    # Data History Configuration
-    ENABLE_DATA_HISTORY: bool = True
-    DATA_RETENTION_DAYS: int = 30
+ 
     
 
 # Initialize settings and validate API keys

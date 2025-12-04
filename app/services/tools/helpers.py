@@ -24,33 +24,6 @@ def create_fallback_sources(
     }
 
 
-def sanitize_questions_data(data: dict) -> dict:
-    """
-    Sanitize question data to fix common LLM output issues.
-    
-    Handles:
-    - Nested arrays: [[\"Q1\"], \"Q2\"] → [\"Q1\", \"Q2\"]
-    - Object questions: [{\"question\": \"Q1\"}] → [\"Q1\"]
-    """
-    if "all_questions" in data:
-        for item in data["all_questions"]:
-            if "questions" in item and isinstance(item["questions"], list):
-                sanitized = []
-                for q in item["questions"]:
-                    if isinstance(q, list):  # Flatten nested lists
-                        for nested_q in q:
-                            if isinstance(nested_q, str):
-                                sanitized.append(nested_q)
-                            elif isinstance(nested_q, dict) and "question" in nested_q:
-                                sanitized.append(nested_q["question"])
-                    elif isinstance(q, dict) and "question" in q:  # Extract from objects
-                        sanitized.append(q["question"])
-                    elif isinstance(q, str):  # Keep strings as-is
-                        sanitized.append(q)
-                item["questions"] = sanitized
-    return data
-
-
 
 def optimize_search_query(skill: str) -> str:
     """

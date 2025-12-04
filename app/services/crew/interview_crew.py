@@ -125,6 +125,7 @@ class InterviewPrepCrew:
                 Process a single batch with granular locking.
                 """
                 try:
+                    self.logger.info(f"Starting batch processing for skills: {batch_skills}")
                     formatted_skills = ", ".join(batch_skills)
 
                     # ---------------------------------------------------------
@@ -141,7 +142,9 @@ class InterviewPrepCrew:
                             verbose=settings.DEBUG_MODE
                         )
 
+                        self.logger.info(f"Kickoff source crew for batch: {batch_skills}")
                         source_result = await source_crew.kickoff_async(inputs={"skills": formatted_skills})
+                        self.logger.info(f"Finished source crew for batch: {batch_skills}")
 
                     # Parse sources outside semaphore (not an API call)
                     sources = self._parse_crew_result(
@@ -165,12 +168,15 @@ class InterviewPrepCrew:
                         )
 
                         # Pass sources as context to question generation
+                        context_str = sources.model_dump_json() if sources else "{}"
+                        self.logger.info(f"Kickoff question crew for batch: {batch_skills} with context size: {len(context_str)}")
                         question_result = await question_crew.kickoff_async(
                             inputs={
                                 "skills": formatted_skills,
-                                "context": sources.model_dump_json() if sources else "{}"
+                                "context": context_str
                             }
                         )
+                        self.logger.info(f"Finished question crew for batch: {batch_skills}")
 
                     # Parse questions outside semaphore (not an API call)
                     questions_obj = self._parse_crew_result(
