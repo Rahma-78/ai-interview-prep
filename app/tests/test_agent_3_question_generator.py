@@ -72,7 +72,7 @@ async def test_question_generator_agent_flow():
         agents=[question_agent],
         tasks=[question_task],
         process=Process.sequential,
-        verbose=True
+        verbose=False
     )
     
     # 6. Prepare inputs to pass to crew (simulating Agent 2's output)

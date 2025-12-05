@@ -103,7 +103,10 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
                 grounding_meta = None
                 if response.candidates and response.candidates[0].grounding_metadata:
                     grounding_meta = response.candidates[0].grounding_metadata
-
+                    # Ensure grounding_chunks is a list, not None
+                    if getattr(grounding_meta, "grounding_chunks", None) is None:
+                        grounding_meta.grounding_chunks = []
+                
                 # Handle empty text with metadata (Edge case)
                 if not response_text and grounding_meta:
                      response_text = "Search completed but no summary generated."

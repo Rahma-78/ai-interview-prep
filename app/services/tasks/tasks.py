@@ -88,4 +88,5 @@ class InterviewPrepTasks:
             agent=agent,
             output_file="app/data/interview_questions.json",
             expected_output="JSON: {\"all_questions\": [{\"skill\": \"...\", \"questions\": [\"question1\", \"question2\", ...]}]}",
+            output_pydantic=AllInterviewQuestions
         )

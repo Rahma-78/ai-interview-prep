@@ -1,3 +1,7 @@
+import os
+# Disable CrewAI Telemetry to prevent 20s delay in "Trace Batch Finalization"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response, HTTPException

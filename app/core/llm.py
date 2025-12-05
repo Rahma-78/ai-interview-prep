@@ -25,7 +25,7 @@ llm_gemini = get_llm(
     api_key=settings.GEMINI_API_KEY
 )
 
-# Groq Llama - For skill extraction (Agent 1)
+# for testing
 
 llm_groq = get_llm(
     "groq/llama-3.3-70b-versatile",
@@ -34,28 +34,20 @@ llm_groq = get_llm(
     
 )
 
-# DeepSeek via OpenRouter - For question generation (Agent 3)
-llm_openrouter =get_llm(
-    "huggingface/meta-llama/Llama-3.3-70B-Instruct",
+# Meta via huggingface - For skill extraction (Agent 1)
+llm_meta =get_llm(
+    "openrouter/meta-llama/Llama-3.1-8B-Instruct",
     temperature=0.2,
-    api_key=settings.HF_API_KEY,
+    api_key=settings.OPENROUTER_API_KEY
 )
   
-    
-
-#  get_llm(
-#     "openrouter/meituan/longcat-flash-chat:free",
-#     temperature=0.2,
-#     api_key=settings.OPENROUTER_API_KEY,
-   
-# )
-llm_deepseek = get_llm(
-    "huggingface/openai/gpt-oss-120b",
+ # openai via huggingface - For question generation(Agent 3)   
+llm_openai = get_llm(
+    "openrouter/openai/gpt-oss-120b",
     temperature=0.2,
-    api_key=settings.HF_API_KEY,
+    api_key=settings.OPENROUTER_API_KEY,
     
-  
-    
+                              
 )
 
 # --- GenAI SDK Client ---

@@ -41,35 +41,43 @@ class ServiceRateLimiter:
 
     async def acquire_slot(self, service: str):
         """Blocks until a slot is available for the given service."""
-        async with self._lock:
-            now = datetime.now(timezone.utc)
+        while True:
+            wait_time = 0.0
             
-            # 1. Check Penalty Box (Global Hold)
-            if service in self._blocked_until:
-                if now < self._blocked_until[service]:
-                    wait_time = (self._blocked_until[service] - now).total_seconds()
-                    logger.warning(f"Service {service} is blocked. Waiting {wait_time:.1f}s...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    del self._blocked_until[service] # Release block
+            async with self._lock:
+                now = datetime.now(timezone.utc)
+                
+                # 1. Check Penalty Box (Global Hold)
+                if service in self._blocked_until:
+                    if now < self._blocked_until[service]:
+                        wait_time = (self._blocked_until[service] - now).total_seconds()
+                        logger.warning(f"Service {service} is blocked. Waiting {wait_time:.1f}s...")
+                    else:
+                        del self._blocked_until[service] # Release block
 
-            # 2. Check RPM (Sliding Window)
-            history = self._services[service]
-            limit = self._limits.get(service, self._limits['default'])
+                # 2. Check RPM (Sliding Window)
+                if wait_time == 0:
+                    history = self._services[service]
+                    limit = self._limits.get(service, self._limits['default'])
 
-            # Remove requests older than 1 minute
-            while history and history[0] < now - timedelta(minutes=1):
-                history.popleft()
+                    # Remove requests older than 1 minute
+                    while history and history[0] < now - timedelta(minutes=1):
+                        history.popleft()
 
-            # If full, wait for the oldest request to expire
-            if len(history) >= limit:
-                wait_time = (history[0] + timedelta(minutes=1) - now).total_seconds()
-                if wait_time > 0:
-                    logger.info(f"Local RPM limit for {service}. Sleeping {wait_time:.2f}s")
-                    await asyncio.sleep(wait_time)
-            
-            # Record this new request
-            self._services[service].append(datetime.now(timezone.utc))
+                    # If full, wait for the oldest request to expire
+                    if len(history) >= limit:
+                        wait_time = (history[0] + timedelta(minutes=1) - now).total_seconds()
+                        if wait_time > 0:
+                            logger.info(f"Local RPM limit for {service}. Sleeping {wait_time:.2f}s")
+                    else:
+                        # Success! Record and return
+                        self._services[service].append(now)
+                        return
+
+            # If we need to wait, sleep OUTSIDE the lock
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+                # Loop back and try again
 
     async def block_service(self, service: str, seconds: float):
         """Manually blocks a service (used when we hit a 429/Quota error)."""

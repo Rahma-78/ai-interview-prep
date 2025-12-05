@@ -2,7 +2,7 @@ from crewai import Agent
 from typing import List, Dict, Callable
 
 from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills, InterviewQuestions
-from app.core.llm import llm_gemini, llm_groq, llm_openrouter, llm_deepseek
+from app.core.llm import llm_gemini, llm_groq, llm_meta,llm_openai
 from app.core.config import settings
 
 class InterviewPrepAgents:
@@ -17,9 +17,8 @@ class InterviewPrepAgents:
         """
         self.llm_gemini = llm_gemini
         self.llm_groq = llm_groq
-        self.llm_openrouter = llm_openrouter
-        self.llm_deepseek = llm_deepseek
-
+        self.llm_meta = llm_meta
+        self.llm_openai = llm_openai
 
     def resume_analyzer_agent(self, tools: Dict[str, Callable]) -> Agent:
         """
@@ -38,7 +37,7 @@ class InterviewPrepAgents:
                 "You prioritize skills that enable questions about 'how' and 'why' rather than just 'what'."
             ),
             
-            llm=self.llm_openrouter,
+            llm=self.llm_groq,
             tools=[tools["file_text_extractor"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
@@ -85,8 +84,7 @@ class InterviewPrepAgents:
                 "Your expertise lies in crafting challenging, conceptually deep questions that assess a candidate's understanding. "
                 "You use the provided context as a knowledge base combined with your technical expertise to generate questions for ALL skills in each batch."
             ),
-            llm=self.llm_deepseek,  
+            llm=self.llm_openai,  
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
-            response_format=AllInterviewQuestions  # Enforce correct JSON schema
         )

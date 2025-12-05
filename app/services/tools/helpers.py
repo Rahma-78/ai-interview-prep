@@ -91,7 +91,7 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
     # 3. MAP GROUNDING METADATA
     # We do this logic BEFORE modifying the content strings significantly
     if grounding_meta and hasattr(grounding_meta, 'grounding_supports') and grounding_meta.grounding_supports:
-        chunks = grounding_meta.grounding_chunks
+        chunks = grounding_meta.grounding_chunks or []
         supports = grounding_meta.grounding_supports
         
         for section in sections:
