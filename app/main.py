@@ -13,8 +13,8 @@ from app.api.v1.interview import interview_router
 from app.core.logger import setup_logger
 from app.core.exceptions import global_exception_handler, http_exception_handler
 
-# Setup logger
-setup_logger()
+# Setup logger with fresh log file on startup
+setup_logger(clear_log=True)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager

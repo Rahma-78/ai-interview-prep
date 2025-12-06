@@ -72,15 +72,22 @@ async def test_question_generator_agent_flow():
         agents=[question_agent],
         tasks=[question_task],
         process=Process.sequential,
-        verbose=False
+        verbose=True
     )
     
-    # 6. Prepare inputs to pass to crew (simulating Agent 2's output)
-    # In production: This comes from discover_task.output via task.context
-    # In test: We provide it directly via crew inputs
+    # 6. Prepare inputs - OPTIMIZED PLAIN TEXT FORMAT (matches production)
+    # OLD (wasteful): all_sources.model_dump_json()  ← JSON overhead
+    # NEW (efficient): Plain text format saves ~30% tokens
+    context_parts = []
+    for source in all_sources.all_sources:
+        context_parts.append(f"Skill: {source.skill}\n{source.extracted_content.strip()}")
+    context_str = "\n\n---\n\n".join(context_parts)
+    
+    skills_str = ", ".join(all_skills)
+    
     inputs = {
-        "context": all_sources.model_dump_json(),  # Pass the full context as JSON string
-        "skills": all_skills  # Also pass just the skill names
+        "skills": skills_str,
+        "context": context_str  # Plain text, not JSON!
     }
     
     # 7. Execute the crew with inputs (following Agent 2 test pattern)

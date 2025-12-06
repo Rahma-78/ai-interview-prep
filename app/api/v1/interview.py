@@ -77,10 +77,14 @@ async def generate_interview_questions(
                         await manager.send_message(event["content"], client_id)
                     
                     elif event["type"] == "data":
-                        # Stream data results as NDJSON
+                        # Stream data results as NDJSON immediately
                         result_data = event["content"]
+                        skill_name = result_data["skill"]
+                        question_count = len(result_data.get("questions", []))
+                        logger.info(f"📤 Streaming result for '{skill_name}' ({question_count} questions)")
+                        
                         data = InterviewQuestionState(
-                            skill=result_data["skill"],
+                            skill=skill_name,
                             questions=result_data["questions"],
                             isLoading=False
                         ).model_dump()
@@ -110,10 +114,17 @@ async def generate_interview_questions(
                 # Step 6: Cleanup file after streaming completes
                 cleanup_file(file_location)
 
-        # Return streaming response (cleanup handled in generator's finally block)
+        # Return streaming response with headers to disable buffering
+        # Cache-Control: no-cache prevents browser caching
+        # X-Accel-Buffering: no disables nginx/proxy buffering for immediate delivery
         return StreamingResponse(
             response_generator(), 
-            media_type="application/x-ndjson"
+            media_type="application/x-ndjson",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive"
+            }
         )
 
     except Exception as e:

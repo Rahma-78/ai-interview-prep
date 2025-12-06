@@ -28,6 +28,7 @@ def create_fallback_sources(
 def optimize_search_query(skill: str) -> str:
     """
     Generates an effective Google search query for technical interview questions.
+    Handles acronyms by expanding them for better search results.
 
     Args:
         skill: The skill to search for.
@@ -35,12 +36,24 @@ def optimize_search_query(skill: str) -> str:
     Returns:
         An optimized search query string.
     """
-    skill = skill.strip().lower()
-    # Core phrase for direct, relevant results
-    base =  f'"{skill}" "technical interview questions" '
-   
+    skill = skill.strip()
+    
+    # Extract acronym from parentheses if present
+    # e.g., "Large Language Models (LLMs)" → use "Large Language Models" + "LLMs"
+    acronym_match = re.match(r'(.+?)\s*\(([A-Z]+)\)', skill)
+    
+    if acronym_match:
+        # Use both full name and acronym for better coverage
+        full_name = acronym_match.group(1).strip()
+        acronym = acronym_match.group(2).strip()
+        base = f'("{full_name}" OR "{acronym}") "technical interview questions"'
+    else:
+        # Regular skill without acronym
+        base = f'"{skill}" "technical interview questions"'
+    
     # Exclude common video platforms and non-technical sites
     exclude = "-youtube -vimeo -tiktok -facebook -twitter -instagram -reddit -quora"
+    
     # Combine for a more effective search
     query = f"{base} {exclude}"
     return query
@@ -66,19 +79,42 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
     # Create sections with start/end indices based on the RAW text
     sections = []
     for i, match in enumerate(matches):
-        section_title = match.group(1).lower().strip()
+        section_title = match.group(1).strip()
+        section_title_lower = section_title.lower()
         start_idx = match.start()
         
         # End index is the start of the next header, or end of string
         end_idx = matches[i+1].start() if i + 1 < len(matches) else len(raw_text)
         
-        # Fuzzy match the header title to our requested skills
-        # This handles cases like LLM writing "## Python Logic" instead of "## Python"
+        # Fuzzy matching strategies (in order of priority)
         matched_skill = None
+        
         for key in skill_map:
-            if key == section_title or (key in section_title and len(section_title) < len(key) + 10):
+            # Strategy 1: Exact match (case-insensitive)
+            if key == section_title_lower:
                 matched_skill = skill_map[key]
                 break
+            
+            # Strategy 2: Skill name contained in header
+            # e.g., "python" in "python programming"
+            if key in section_title_lower:
+                matched_skill = skill_map[key]
+                break
+            
+            # Strategy 3: Header contained in skill name (common with acronyms)
+            # e.g., "llms" in "large language models (llms)"
+            if section_title_lower in key:
+                matched_skill = skill_map[key]
+                break
+            
+            # Strategy 4: Acronym extraction and matching
+            # Extract acronyms from skill: "Large Language Models (LLMs)" → "LLMs"
+            acronym_match = re.search(r'\(([A-Za-z]+)\)', skill_map[key])
+            if acronym_match:
+                acronym_lower = acronym_match.group(1).lower()
+                if acronym_lower == section_title_lower or acronym_lower in section_title_lower:
+                    matched_skill = skill_map[key]
+                    break
         
         if matched_skill:
             sections.append({
@@ -138,11 +174,11 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
             if data["source_count"] > 0:
                 logger.info(f"Skill '{skill}' synthesized from {data['source_count']} sources.")
         else:
-            # Fallback for missing sections
-            logger.warning(f"Parser could not find section for '{skill}'")
+            # Section not found - likely Gemini didn't find relevant sources
+            logger.warning(f"No section found for '{skill}' - source discovery may have failed")
             final_output.append({
                 "skill": skill,
-                "extracted_content": f"AI failed to structure response for {skill}."
+                "extracted_content": f"No sources found . This may indicate limited available content or search failures."
             })
 
     return final_output

@@ -10,7 +10,7 @@ from typing import List, Dict
 
 # Third-Party Imports
 from langchain_community.document_loaders import PyPDFLoader
-from crewai.tools import tool
+
 
 # Application-Specific Imports
 from app.services.tools.source_discovery import discover_sources
@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # --- CrewAI Tools ---
 
 
-@tool
 def file_text_extractor(file_path: str) -> str:
     """
     Extracts all text content from a PDF file using LangChain's PyPDFLoader.
@@ -67,7 +66,6 @@ def file_text_extractor(file_path: str) -> str:
         return f"An error occurred while reading the PDF: {str(e)}"
 
 
-@tool
 async def grounded_source_discoverer(skills: List[str]) -> Dict:
     """
     Asynchronously retrieves Gemini's native search response for a list of skills.

@@ -1,8 +1,7 @@
 from crewai import Agent 
-from typing import List, Dict, Callable
+from typing import Dict, Callable
 
-from app.schemas.interview import AllInterviewQuestions, AllSkillSources, ExtractedSkills, InterviewQuestions
-from app.core.llm import llm_gemini, llm_groq, llm_meta,llm_openai
+from app.core.llm import chat_groq
 from app.core.config import settings
 
 class InterviewPrepAgents:
@@ -15,10 +14,7 @@ class InterviewPrepAgents:
         """
         Initializes the InterviewPrepAgents with instances of the language models.
         """
-        self.llm_gemini = llm_gemini
-        self.llm_groq = llm_groq
-        self.llm_meta = llm_meta
-        self.llm_openai = llm_openai
+        self.llm = chat_groq
 
     def resume_analyzer_agent(self, tools: Dict[str, Callable]) -> Agent:
         """
@@ -37,7 +33,7 @@ class InterviewPrepAgents:
                 "You prioritize skills that enable questions about 'how' and 'why' rather than just 'what'."
             ),
             
-            llm=self.llm_groq,
+            llm=self.llm,
             tools=[tools["file_text_extractor"]],
             verbose=settings.DEBUG_MODE,
             allow_delegation=False,
@@ -45,46 +41,3 @@ class InterviewPrepAgents:
             max_rpm=settings.AGENT_MAX_RPM,
             memory=False,
          )
-
-    def source_discoverer_agent(self, tools: Dict[str, Callable]) -> Agent:
-        """
-        Defines the agent responsible for discovering authoritative web sources for technical skills using Gemini's native search grounding.
-        """
-        return Agent(  # type: ignore
-            role='Expert Research Analyst',
-            goal='Find the best text-based web pages with technical resources for specific skills using Gemini\'s native search grounding.',
-            backstory=(
-                "You are a world-class digital researcher with access to Gemini's native search capabilities. "
-                "Your goal is to provide the best source material for generating interview questions. "
-                "You MUST rely strictly on the output of the 'grounded_source_discoverer' tool. "
-                "Do not fabricate sources or hallucinate content. If the tool returns few results, work with what is provided."
-            ),
-            llm=self.llm_gemini,  # Use Gemini for both agent orchestration and grounded search
-            tools=[tools["grounded_source_discoverer"]],
-            verbose=settings.DEBUG_MODE,
-            allow_delegation=False,
-            max_iter=settings.AGENT_MAX_ITER,
-            max_rpm=settings.AGENT_MAX_RPM,
-            cache=False,
-            response_format=AllSkillSources  # Enforce correct JSON schema
-        )
-
-
-    def question_generator_agent(self, tools: Dict[str, Callable]) -> Agent:
-        """
-        Defines the agent responsible for generating insightful interview questions.
-        Receives batched context from source discoverer and generates questions for all skills in the batch.
-        """
-        return Agent(  # type: ignore
-            role='Batch Question Generator',
-            goal=f'Generate insightful, non-coding interview questions for batches of skills (typically {settings.BATCH_SIZE} skills per batch) using provided context.',
-            backstory=(
-                "You are an experienced technical interviewer who efficiently processes batches of skills in parallel workflows. "
-                "You receive context from the source discovery phase containing technical content for multiple skills. "
-                "Your expertise lies in crafting challenging, conceptually deep questions that assess a candidate's understanding. "
-                "You use the provided context as a knowledge base combined with your technical expertise to generate questions for ALL skills in each batch."
-            ),
-            llm=self.llm_openai,  
-            verbose=settings.DEBUG_MODE,
-            allow_delegation=False,
-        )

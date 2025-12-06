@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     GROQ_RPM: int = 30
     
     # Agent Configuration
-    AGENT_MAX_ITER: int = 3
+    AGENT_MAX_ITER: int = 2
     AGENT_MAX_RPM: int = 15
     
     # Retry Configuration

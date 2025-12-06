@@ -37,16 +37,32 @@ class ColorFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
-def setup_logger(name: str = "app", log_level: int = logging.INFO) -> logging.Logger:
+def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bool = False) -> logging.Logger:
     """
     Sets up a logger with console (colored) and file (rotating) handlers.
+    
+    Args:
+        name: Logger name
+        log_level: Logging level
+        clear_log: If True, clears the log file at startup (useful for fresh runs)
     """
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 
     # Prevent adding handlers multiple times
     if logger.hasHandlers():
+        # If clear_log requested and handlers already exist, clear the log file
+        if clear_log:
+            log_file = LOGS_DIR / "app.log"
+            if log_file.exists():
+                log_file.write_text("")  # Clear file
         return logger
+
+    # Clear log file if requested (fresh start)
+    if clear_log:
+        log_file = LOGS_DIR / "app.log"
+        if log_file.exists():
+            log_file.write_text("")  # Truncate log file
 
     # Console Handler with Colors
     console_handler = logging.StreamHandler(sys.stdout)

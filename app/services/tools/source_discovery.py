@@ -88,14 +88,22 @@ async def discover_sources(skills: List[str]) -> List[Dict]:
             config = types.GenerateContentConfig(tools=[grounding_tool])
 
             try:
-                # 4. Execute Safe API Call
+                # 4. Execute Safe API Call with Gemini-specific rate limiting
+                import time
+                logger.info(f"⏱️ Gemini API call started for batch: {chunk}")
+                start_time = time.perf_counter()
+                
                 response = await safe_api_call(
                     asyncio.to_thread,
                     client.models.generate_content,
+                    service='gemini',  # Use Gemini-specific RPM limit
                     model=GEMINI_MODEL,
                     contents=prompt,
                     config=config
                 )
+                
+                elapsed = time.perf_counter() - start_time
+                logger.info(f"⏱️ Gemini API call completed in {elapsed:.2f}s for batch: {chunk}")
 
                 response_text = response.text if response.text else ""
                 
