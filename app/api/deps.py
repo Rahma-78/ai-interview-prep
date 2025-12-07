@@ -1,16 +1,16 @@
 from typing import Generator
-from app.services.crew.interview_crew import InterviewPrepCrew
+from app.services.pipeline.interview_pipeline import InterviewPipeline
 from app.core.config import settings
 
 from typing import Callable
 
-def get_crew_factory() -> Callable[[str], InterviewPrepCrew]:
+def get_crew_factory() -> Callable[[str], InterviewPipeline]:
     """
-    Dependency for providing a factory to create InterviewPrepCrew instances.
+    Dependency for providing a factory to create InterviewPipeline instances.
     This allows deferring creation until the file path is known.
     """
-    def factory(file_path: str) -> InterviewPrepCrew:
-        return InterviewPrepCrew(file_path=file_path, validate=False)
+    def factory(file_path: str, correlation_id: str = None) -> InterviewPipeline:
+        return InterviewPipeline(file_path=file_path, validate=False, correlation_id=correlation_id)
     return factory
 
 # Example of another dependency (if needed)

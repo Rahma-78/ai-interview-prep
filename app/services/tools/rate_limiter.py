@@ -25,16 +25,26 @@ logger = logging.getLogger(__name__)
 # --- 1. The Clean Rate Limiter (Prevention) ---
 class ServiceRateLimiter:
     """
-    Strictly handles Local RPM (Requests Per Minute).
-    Does NOT handle retries or errors. just counts.
+    Handles both RPM (Requests Per Minute) and daily quota limits.
+    Prevents hitting hard API quota limits like Gemini's 20 requests/day.
     """
     def __init__(self):
+        # RPM tracking (sliding window - last 1 minute)
         self._services: Dict[str, deque] = defaultdict(deque)
-        self._limits = {
+        self._rpm_limits = {
             'gemini': settings.GEMINI_RPM,
             'openrouter': settings.OPENROUTER_RPM,
-            'default': settings.REQUESTS_PER_MINUTE
+            'groq': settings.GROQ_RPM
         }
+        
+        # Daily quota tracking (sliding window - last 24 hours)
+        self._daily_usage: Dict[str, deque] = defaultdict(deque)
+        self._daily_limits = {
+            'gemini': settings.GEMINI_DAILY_LIMIT,
+            'openrouter': settings.OPENROUTER_DAILY_LIMIT,
+            'groq': settings.GROQ_DAILY_LIMIT,
+        }
+        
         self._lock = asyncio.Lock()
         # "Penalty Box" - stores end_time if a service is blocked
         self._blocked_until: Dict[str, datetime] = {}
@@ -53,12 +63,40 @@ class ServiceRateLimiter:
                         wait_time = (self._blocked_until[service] - now).total_seconds()
                         logger.warning(f"Service {service} is blocked. Waiting {wait_time:.1f}s...")
                     else:
-                        del self._blocked_until[service] # Release block
+                        del self._blocked_until[service]  # Release block
 
-                # 2. Check RPM (Sliding Window)
+                # 2. Check Daily Quota (if service has a daily limit)
+                if wait_time == 0 and service in self._daily_limits:
+                    daily_history = self._daily_usage[service]
+                    daily_limit = self._daily_limits[service]
+                    
+                    # Remove requests older than 24 hours
+                    while daily_history and daily_history[0] < now - timedelta(hours=24):
+                        daily_history.popleft()
+                    
+                    # Check if we've hit the daily quota
+                    if len(daily_history) >= daily_limit:
+                        # Calculate when the oldest request will expire
+                        oldest_request_expires_at = daily_history[0] + timedelta(hours=24)
+                        wait_seconds = (oldest_request_expires_at - now).total_seconds()
+                        
+                        if wait_seconds > 0:
+                            logger.error(
+                                f"❌ Daily quota EXHAUSTED for {service}! "
+                                f"({len(daily_history)}/{daily_limit} used). "
+                                f"Next slot available in {wait_seconds/3600:.1f} hours."
+                            )
+                            # Don't wait here - raise an exception instead
+                            raise RuntimeError(
+                                f"Daily quota exhausted for {service}. "
+                                f"Used {len(daily_history)}/{daily_limit} requests in last 24h. "
+                                f"Quota resets in {wait_seconds/3600:.1f} hours."
+                            )
+
+                # 3. Check RPM (Sliding Window)
                 if wait_time == 0:
                     history = self._services[service]
-                    limit = self._limits.get(service, self._limits['default'])
+                    limit = self._rpm_limits.get(service, self._rpm_limits['default'])
 
                     # Remove requests older than 1 minute
                     while history and history[0] < now - timedelta(minutes=1):
@@ -72,6 +110,9 @@ class ServiceRateLimiter:
                     else:
                         # Success! Record and return
                         self._services[service].append(now)
+                        # Also track for daily quota
+                        if service in self._daily_limits:
+                            self._daily_usage[service].append(now)
                         return
 
             # If we need to wait, sleep OUTSIDE the lock
@@ -84,6 +125,20 @@ class ServiceRateLimiter:
         async with self._lock:
             logger.error(f"Blocking {service} for {seconds}s due to API rejection.")
             self._blocked_until[service] = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+    
+    def get_daily_usage(self, service: str) -> tuple[int, int]:
+        """Returns (current_usage, daily_limit) for a service."""
+        if service not in self._daily_limits:
+            return (0, 0)
+        
+        now = datetime.now(timezone.utc)
+        daily_history = self._daily_usage[service]
+        
+        # Clean up old entries
+        while daily_history and daily_history[0] < now - timedelta(hours=24):
+            daily_history.popleft()
+        
+        return (len(daily_history), self._daily_limits[service])
 
 # Global Instance
 rate_limiter = ServiceRateLimiter()
@@ -139,6 +194,7 @@ async def safe_api_call(
 ) -> Any:
     """
     The only function you call. Handles locking -> executing -> catching -> retrying.
+    Fails fast on quota exhaustion (don't retry quota errors).
     """
     
     # Define retry logic
@@ -152,19 +208,46 @@ async def safe_api_call(
 
     async for attempt in retryer:
         with attempt:
-            # STEP A: Check Permissions (Local Rate Limit)
+            # STEP A: Check Permissions (Local Rate Limit + Daily Quota)
             # We do this BEFORE every attempt.
-            await rate_limiter.acquire_slot(service)
+            try:
+                await rate_limiter.acquire_slot(service)
+            except RuntimeError as quota_error:
+                # Daily quota exhausted - fail immediately without retrying
+                logger.error(f"🚫 Quota exhaustion detected: {quota_error}")
+                raise quota_error
 
             try:
                 # STEP B: Execute
                 return await func(*args, **kwargs)
             
             except (ResourceExhausted, TooManyRequests) as e:
-                # STEP C: Handle Rejection (Update Global State)
-                # If we crashed, we must tell the limiter to stop EVERYONE else.
-                wait_time = parse_retry_after(e) or settings.RETRY_MIN_QUOTA_DELAY
-                await rate_limiter.block_service(service, wait_time)
+                # STEP C: Detect if this is a quota error or a transient rate limit
+                error_message = str(e).lower()
                 
-                # Now raise the error so Tenacity handles the actual retry sleep
-                raise e
+                # Quota error keywords that indicate hard quota limits (not transient)
+                quota_keywords = ['quota', 'daily', 'limit exceeded', 'billing', 'plan']
+                is_quota_error = any(keyword in error_message for keyword in quota_keywords)
+                
+                if is_quota_error:
+                    # Hard quota limit - fail immediately
+                    logger.error(
+                        f"🚫 API quota exhausted for {service}. "
+                        f"Error: {str(e)[:200]}... "
+                        f"This is a hard limit that won't resolve with retries."
+                    )
+                    # Re-raise as a RuntimeError to skip retry logic
+                    raise RuntimeError(
+                        f"API quota exhausted for {service}. Check your billing/plan. "
+                        f"Original error: {str(e)[:300]}"
+                    ) from e
+                else:
+                    # Transient rate limit - update global state and retry
+                    wait_time = parse_retry_after(e) or settings.RETRY_MIN_QUOTA_DELAY
+                    await rate_limiter.block_service(service, wait_time)
+                    logger.warning(
+                        f"⚠️ Transient rate limit for {service}. "
+                        f"Will retry after {wait_time}s..."
+                    )
+                    # Re-raise to trigger retry
+                    raise e

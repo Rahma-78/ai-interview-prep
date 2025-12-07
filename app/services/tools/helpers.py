@@ -76,6 +76,15 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
     
     matches = list(header_pattern.finditer(raw_text))
     
+    # DEBUG: Log header detection for validation
+    logger.debug(f"Detected {len(matches)} headers for {len(skills)} skills")
+    if matches:
+        detected_headers = [m.group(1).strip() for m in matches]
+        logger.debug(f"Detected headers: {detected_headers}")
+    
+    if len(matches) < len(skills):
+        logger.warning(f"Header count mismatch: found {len(matches)} headers but expected {len(skills)} skills")
+    
     # Create sections with start/end indices based on the RAW text
     sections = []
     for i, match in enumerate(matches):
@@ -178,7 +187,7 @@ def parse_batch_response(raw_text: str, skills: List[str], grounding_meta: Any =
             logger.warning(f"No section found for '{skill}' - source discovery may have failed")
             final_output.append({
                 "skill": skill,
-                "extracted_content": f"No sources found . This may indicate limited available content or search failures."
+                "extracted_content": f"No sources found for '{skill}'. The search may have returned limited content or the response format was incompatible with parsing. Consider manual research for this skill."
             })
 
     return final_output

@@ -1,0 +1,20 @@
+# Environment & Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+
+# Project-Specific
+logs/
+*.log
+app/data/
+
+# VS Code
+.vscode/
+
+#tests
+app/tests

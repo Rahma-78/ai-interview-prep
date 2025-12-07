@@ -4,15 +4,16 @@ import json
 import os
 import shutil
 import traceback
-from typing import List
+from typing import List, Dict, Any
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Form
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Form, Body
+from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.background import BackgroundTask
 from app.api.deps import get_crew_factory
 from app.core.websocket import manager
 from app.schemas.interview import InterviewQuestionState
-from app.services.crew.interview_crew import InterviewPrepCrew
+from app.services.pipeline.interview_pipeline import InterviewPipeline
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -27,6 +28,40 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(client_id)
+
+@interview_router.post("/download-results")
+async def download_results(
+    results: List[Dict[str, Any]] = Body(...),
+    filename: str = Body(default="resume")
+):
+    """
+    Generate and download results as a TXT file on-demand.
+    Uses ReportGenerator service to format the content.
+    """
+    try:
+        # Generate timestamped filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"{filename}_{timestamp}_results.txt"
+        
+        # Use ReportGenerator service (SRP)
+        from app.services.tools.report_generator import ReportGenerator
+        text_content = ReportGenerator.generate_txt_report(results, filename)
+        
+        logger.info(f"Generating download text file: {download_filename}")
+        
+        # Return as Text response
+        from fastapi.responses import Response
+        return Response(
+            content=text_content,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_filename}"'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating download: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating download: {str(e)}")
 
 @interview_router.post("/generate-questions/")
 async def generate_interview_questions(
@@ -67,8 +102,13 @@ async def generate_interview_questions(
         async def response_generator():
             """Generator that creates crew, processes, and ensures cleanup."""
             try:
-                # Step 3: Create crew (without re-validation)
-                crew = crew_factory(file_location)
+                # Step 3: Create crew with correlation ID (without re-validation)
+                import uuid
+                from app.core.logger import set_correlation_id
+                correlation_id = str(uuid.uuid4())
+                set_correlation_id(correlation_id)
+                
+                crew = crew_factory(file_location, correlation_id=correlation_id)
                 
                 # Step 4: Process and get results via async generator
                 async for event in crew.run_async_generator():

@@ -4,7 +4,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-def _parse_crew_result(
+def parse_llm_response(
         result: Any,
         schema_class: type,
         fallback_data: Any = None

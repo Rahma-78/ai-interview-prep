@@ -1,0 +1,18 @@
+# fastapi - Web framework
+fastapi
+uvicorn
+python-multipart
+
+# LLM Providers
+langchain_groq
+langchain_openai
+langchain_community
+google-generativeai
+
+# Utilities
+python-dotenv
+json_repair
+pypdf
+httpx
+tenacity
+pydantic-settings

@@ -28,17 +28,18 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
-    HF_API_KEY: str = ""
-    REQUESTS_PER_MINUTE: int = 10
+   
     
     # Service Specific Limits (Requests Per Minute)
     GEMINI_RPM: int = 15
     OPENROUTER_RPM: int = 20
     GROQ_RPM: int = 30
     
-    # Agent Configuration
-    AGENT_MAX_ITER: int = 2
-    AGENT_MAX_RPM: int = 15
+    # Service Specific Daily Limits
+    GEMINI_DAILY_LIMIT: int = 1500
+    OPENROUTER_DAILY_LIMIT: int = 1000  
+    GROQ_DAILY_LIMIT: int = 1000  
+    
     
     # Retry Configuration
     RETRY_MAX_ATTEMPTS: int = 3
@@ -54,6 +55,20 @@ class Settings(BaseSettings):
     # Pipeline Configuration
     SKILL_COUNT: int = 9
     BATCH_SIZE: int = 3
+    
+    # Concurrency Configuration
+    MAX_CONCURRENT_BATCHES: int = 3
+    SOURCE_DISCOVERY_CONCURRENCY: int = 3
+    MIN_SOURCES_PER_SKILL: int = 3  # Minimum required sources per skill for quality
+    
+    # Timeout Configuration (seconds)
+    GLOBAL_TIMEOUT_SECONDS: int = 600  # 10 minutes
+    
+    # Token Management
+    SAFE_TOKEN_LIMIT: int = 50000  # Safe input threshold for OpenRouter gpt-oss-120b
+    
+    # File Upload Limits
+    MAX_FILE_SIZE_MB: int = 10  # Maximum resume file size in MB
 
 
 # Initialize settings and validate API keys

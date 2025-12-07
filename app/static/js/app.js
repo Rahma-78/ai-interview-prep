@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingText = document.getElementById('loading-text');
 
     let currentFile = null;
+    let allResults = []; // Store all results for download
 
     // Generate a random client ID
     const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
@@ -131,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toggleView('analyzing');
         questionsContainer.innerHTML = '';
+        allResults = []; // Reset results for new analysis
         updateProgress(0);
 
         const formData = new FormData();
@@ -150,6 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Completion state
             updateProgress(3);
             setTimeout(() => {
+                // Show download button if we have results
+                if (allResults.length > 0) {
+                    createDownloadButton();
+                }
+
                 analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
                 analyzeBtn.classList.remove('hidden');
                 loadingSection.classList.add('hidden');
@@ -173,16 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function readStream(reader) {
         const decoder = new TextDecoder();
         let buffer = '';
-        let resultCount = 0;
-
-        console.log('📥 Starting stream reader...');
 
         while (true) {
             const { done, value } = await reader.read();
-            if (done) {
-                console.log(`📥 Stream complete. Total results: ${resultCount}`);
-                break;
-            }
+            if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
@@ -192,8 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (line.trim()) {
                     try {
                         const data = JSON.parse(line);
-                        resultCount++;
-                        console.log(`📥 Received result #${resultCount}: ${data.skill} (${data.questions?.length || 0} questions)`);
                         appendResult(data);
                     } catch (e) {
                         console.error('JSON Parse Error:', e);
@@ -264,6 +263,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Store result for download
+        allResults.push({
+            skill: item.skill,
+            questions: item.questions
+        });
+
         const card = document.createElement('div');
         card.className = 'skill-card';
         card.style.animation = 'slideUp 0.5s ease backwards';
@@ -301,5 +306,65 @@ document.addEventListener('DOMContentLoaded', () => {
         if (questionsContainer.children.length === 1) {
             setTimeout(() => card.classList.add('active'), 100);
         }
+    }
+
+    function createDownloadButton() {
+        // Check if button already exists
+        if (document.getElementById('download-btn')) return;
+
+        const downloadBtn = document.createElement('button');
+        downloadBtn.id = 'download-btn';
+        downloadBtn.className = 'btn btn-secondary';
+        downloadBtn.innerHTML = '<i class="fa-solid fa-download"></i> Download Results (TXT)';
+        downloadBtn.style.marginLeft = '10px';
+
+        downloadBtn.addEventListener('click', async () => {
+            try {
+                const filename = currentFile ? currentFile.name.replace('.pdf', '') : 'resume';
+
+                const response = await fetch('/api/v1/download-results', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        results: allResults,
+                        filename: filename
+                    })
+                });
+
+                if (!response.ok) throw new Error('Download failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Get filename from Content-Disposition header or generate one
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let downloadFilename = `${filename}_results.txt`;
+
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/i);
+                    if (filenameMatch) {
+                        downloadFilename = filenameMatch[1];
+                    }
+                }
+
+                a.download = downloadFilename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                console.log('Download complete:', downloadFilename);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download results. Please try again.');
+            }
+        });
+
+        // Insert button next to the analyze button
+        analyzeBtn.parentNode.insertBefore(downloadBtn, analyzeBtn.nextSibling);
     }
 });

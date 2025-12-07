@@ -1,18 +1,85 @@
 import logging
 import sys
 import time
+import json
+import re
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Any
+from typing import Callable, Any, Optional
+from contextvars import ContextVar
 
 from logging.handlers import RotatingFileHandler
 import os
+
+# Context variable for correlation ID
+correlation_id_var: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
+
+# Patterns for secrets that should be masked in logs
+SECRET_PATTERNS = [
+    (re.compile(r'(api[_-]?key\s*[=:]\s*)["\']?[\w-]{20,}["\']?', re.IGNORECASE), r'\1***MASKED***'),
+    (re.compile(r'(key\s*[=:]\s*)["\']?sk-[\w-]+["\']?', re.IGNORECASE), r'\1***MASKED***'),
+    (re.compile(r'(bearer\s+)[\w-]{20,}', re.IGNORECASE), r'\1***MASKED***'),
+    (re.compile(r'(authorization\s*[=:]\s*)["\']?[\w-]{20,}["\']?', re.IGNORECASE), r'\1***MASKED***'),
+]
+
+
+def mask_secrets(text: str) -> str:
+    """Mask sensitive values in text."""
+    for pattern, replacement in SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+class SecretMaskingFilter(logging.Filter):
+    """Filter to mask secrets in log messages."""
+    
+    def filter(self, record):
+        if isinstance(record.msg, str):
+            record.msg = mask_secrets(record.msg)
+        if record.args:
+            record.args = tuple(
+                mask_secrets(str(arg)) if isinstance(arg, str) else arg 
+                for arg in record.args
+            )
+        return True
 
 # Create logs directory if it doesn't exist
 # Use absolute path to ensure logs are always written to the project root
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
+
+class CorrelationIdFilter(logging.Filter):
+    """Filter to inject correlation ID into log records."""
+    
+    def filter(self, record):
+        correlation_id = correlation_id_var.get()
+        record.correlation_id = correlation_id if correlation_id else "N/A"
+        return True
+
+
+class JsonFormatter(logging.Formatter):
+    """Formatter for structured JSON logging."""
+    
+    def format(self, record):
+        log_data = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "correlation_id": getattr(record, 'correlation_id', 'N/A'),
+        }
+        
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields
+        if hasattr(record, 'extra_data'):
+            log_data.update(record.extra_data)
+        
+        return json.dumps(log_data)
+
 
 class ColorFormatter(logging.Formatter):
     """Custom formatter to add colors to console output."""
@@ -22,7 +89,7 @@ class ColorFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format_str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format_str = "%(asctime)s - [%(correlation_id)s] - %(name)s - %(levelname)s - %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format_str + reset,
@@ -37,7 +104,7 @@ class ColorFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
-def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bool = False) -> logging.Logger:
+def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bool = False, use_json: bool = False, mask_secrets: bool = True) -> logging.Logger:
     """
     Sets up a logger with console (colored) and file (rotating) handlers.
     
@@ -45,9 +112,17 @@ def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bo
         name: Logger name
         log_level: Logging level
         clear_log: If True, clears the log file at startup (useful for fresh runs)
+        use_json: If True, uses JSON formatter for file output
+        mask_secrets: If True, masks sensitive values like API keys in logs
     """
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
+    
+    # Add correlation ID filter
+    correlation_filter = CorrelationIdFilter()
+    
+    # Add secret masking filter if enabled
+    secret_filter = SecretMaskingFilter() if mask_secrets else None
 
     # Prevent adding handlers multiple times
     if logger.hasHandlers():
@@ -67,6 +142,9 @@ def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bo
     # Console Handler with Colors
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(ColorFormatter())
+    console_handler.addFilter(correlation_filter)
+    if secret_filter:
+        console_handler.addFilter(secret_filter)
     logger.addHandler(console_handler)
 
     # File Handler with Rotation
@@ -77,13 +155,32 @@ def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bo
         backupCount=5, 
         encoding="utf-8"
     )
-    file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    ))
+    
+    if use_json:
+        file_handler.setFormatter(JsonFormatter(datefmt="%Y-%m-%d %H:%M:%S"))
+    else:
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s - [%(correlation_id)s] - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        ))
+    
+    
+    file_handler.addFilter(correlation_filter)
+    if secret_filter:
+        file_handler.addFilter(secret_filter)
     logger.addHandler(file_handler)
 
     return logger
+
+
+def set_correlation_id(correlation_id: str):
+    """Set the correlation ID for the current context."""
+    correlation_id_var.set(correlation_id)
+
+
+def get_correlation_id() -> Optional[str]:
+    """Get the correlation ID for the current context."""
+    return correlation_id_var.get()
 
 # Initialize logger for decorators
 logger = logging.getLogger(__name__)
