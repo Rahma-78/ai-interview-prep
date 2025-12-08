@@ -257,11 +257,26 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeBtn.classList.remove('hidden');
         }
 
+        // Handle quota exhaustion errors with distinct UI banner
+        // Backend sends: {type: "quota_error", content: {error_type: "QuotaExhausted", user_message: "..."}}
+        if (item.type === 'quota_error') {
+            const userMessage = item.content?.user_message || item.content?.error || 'LLM API quota exceeded. Please try again later.';
+            displayQuotaError(userMessage);
+            return;
+        }
+
+        // Also handle legacy format for backwards compatibility
+        if (item.error_type && item.error_type.toLowerCase() === 'quota_exhausted') {
+            displayQuotaError(item.error || 'LLM API quota exceeded.');
+            return;
+        }
+
         // Fix: Only render card if there are valid questions
         if (!item.questions || item.questions.length === 0) {
             console.warn(`Skipping display for skill '${item.skill}': No questions generated.`);
             return;
         }
+
 
         // Store result for download
         allResults.push({
@@ -306,6 +321,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (questionsContainer.children.length === 1) {
             setTimeout(() => card.classList.add('active'), 100);
         }
+    }
+
+    function displayQuotaError(message) {
+        // Prevent duplicate banners
+        if (document.querySelector('.quota-error-banner')) return;
+
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'quota-error-banner';
+        errorDiv.innerHTML = `
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <div class="quota-error-content">
+                <strong>LLM API Limit Reached</strong>
+                <p>${message}</p>
+            </div>
+        `;
+        questionsContainer.prepend(errorDiv);
+
+        // Log for debugging
+        console.warn('Quota error displayed:', message);
     }
 
     function createDownloadButton() {

@@ -95,7 +95,7 @@ async def generate_interview_questions(
         file_saved = True
         
         # Step 2: Validate file immediately (fail fast)
-        from app.services.crew.file_validator import FileValidator
+        from app.services.pipeline.file_validator import FileValidator
         validator = FileValidator(logger=logger)
         validator.validate(file_location)  # Raises if invalid
         
@@ -128,6 +128,18 @@ async def generate_interview_questions(
                             questions=result_data["questions"],
                             isLoading=False
                         ).model_dump()
+                        yield json.dumps(data) + "\n"
+                    
+                    elif event["type"] == "quota_error":
+                        # Stream quota error with distinct type for frontend
+                        error_data = event["content"]
+                        data = {
+                            "skill": "LLM Quota Limit",
+                            "error": error_data.get("user_message", "API quota exceeded"),
+                            "error_type": "quota_exhausted",
+                            "isLoading": False
+                        }
+                        logger.warning(f"⚠️ Quota error streamed to client: {error_data.get('error', '')[:100]}")
                         yield json.dumps(data) + "\n"
                     
                     elif event["type"] == "error":

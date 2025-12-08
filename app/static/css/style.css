@@ -379,6 +379,38 @@ h1 {
     line-height: 1.5;
 }
 
+/* Quota Error Banner - LLM API limit notification */
+.quota-error-banner {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15));
+    border-left: 4px solid var(--error-color);
+    padding: 1.25rem 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    animation: slideUp 0.4s ease;
+}
+
+.quota-error-banner i {
+    font-size: 1.5rem;
+    color: var(--error-color);
+    margin-top: 2px;
+}
+
+.quota-error-content strong {
+    display: block;
+    color: #fca5a5;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.quota-error-content p {
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
 /* Utilities */
 .hidden {
     display: none !important;

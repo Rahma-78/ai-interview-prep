@@ -1,14 +1,21 @@
 from __future__ import annotations
 import asyncio
 import logging
+import re
 from collections import deque, defaultdict
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Callable, Any, Dict
+from typing import Callable, Any, Dict
 from email.utils import parsedate_to_datetime
 
 from google.api_core.exceptions import (
     ResourceExhausted, ServiceUnavailable, TooManyRequests, InternalServerError
 )
+# Import Gemini SDK's own error types (different from google.api_core)
+try:
+    from google.genai.errors import ClientError as GeminiClientError
+except ImportError:
+    GeminiClientError = None  # Fallback if SDK not installed
+
 from tenacity import (
     AsyncRetrying,
     RetryCallState,
@@ -34,7 +41,8 @@ class ServiceRateLimiter:
         self._rpm_limits = {
             'gemini': settings.GEMINI_RPM,
             'openrouter': settings.OPENROUTER_RPM,
-            'groq': settings.GROQ_RPM
+            'groq': settings.GROQ_RPM,
+            'default': settings.GEMINI_RPM  # Default rate limit for unknown services
         }
         
         # Daily quota tracking (sliding window - last 24 hours)
@@ -44,6 +52,9 @@ class ServiceRateLimiter:
             'openrouter': settings.OPENROUTER_DAILY_LIMIT,
             'groq': settings.GROQ_DAILY_LIMIT,
         }
+        
+        # Quota exhaustion flag (fail-fast when quota is definitively exhausted)
+        self._quota_exhausted: Dict[str, bool] = defaultdict(bool)
         
         self._lock = asyncio.Lock()
         # "Penalty Box" - stores end_time if a service is blocked
@@ -56,6 +67,13 @@ class ServiceRateLimiter:
             
             async with self._lock:
                 now = datetime.now(timezone.utc)
+                
+                # 0. Check Quota Exhaustion Flag (Fail-Fast)
+                if self._quota_exhausted.get(service, False):
+                    raise RuntimeError(
+                        f"Service {service} quota exhausted by previous API call. "
+                        f"No more requests will be accepted until quota resets."
+                    )
                 
                 # 1. Check Penalty Box (Global Hold)
                 if service in self._blocked_until:
@@ -126,6 +144,15 @@ class ServiceRateLimiter:
             logger.error(f"Blocking {service} for {seconds}s due to API rejection.")
             self._blocked_until[service] = datetime.now(timezone.utc) + timedelta(seconds=seconds)
     
+    async def mark_quota_exhausted(self, service: str):
+        """Mark service as quota-exhausted (fail-fast for all future requests)."""
+        async with self._lock:
+            self._quota_exhausted[service] = True
+            logger.error(
+                f"🚫 Service {service} marked as QUOTA EXHAUSTED. "
+                f"All future requests will fail immediately until quota resets."
+            )
+    
     def get_daily_usage(self, service: str) -> tuple[int, int]:
         """Returns (current_usage, daily_limit) for a service."""
         if service not in self._daily_limits:
@@ -146,22 +173,48 @@ rate_limiter = ServiceRateLimiter()
 
 # --- 2. The Smart Wait Logic (The Cure) ---
 def parse_retry_after(exception: Exception) -> float:
-    """Extracts wait time from API headers, defaulting to 0 if not found."""
+    """
+    Extracts wait time from API error responses.
+    Handles multiple formats:
+    - Standard HTTP Retry-After header
+    - Google API metadata retry-after-ms
+    - Gemini SDK error body retryDelay (e.g., '12s' or '12.5s')
+    - Error message "Please retry in X.XXs"
+    """
     try:
-        # Check standard Retry-After header
+        # 1. Check standard Retry-After header
         if hasattr(exception, 'response') and exception.response:
             headers = getattr(exception.response, 'headers', {})
             val = headers.get('Retry-After') or headers.get('retry-after')
             if val:
-                if val.isdigit(): return float(val)
+                if val.isdigit(): 
+                    return float(val)
                 return (parsedate_to_datetime(val) - datetime.now(timezone.utc)).total_seconds()
         
-        # Check Google Metadata
+        # 2. Check Google API core metadata
         if hasattr(exception, 'metadata') and isinstance(exception.metadata, dict):
-             if ms := exception.metadata.get('retry-after-ms'):
-                 return float(ms) / 1000.0
-    except Exception:
-        pass
+            if ms := exception.metadata.get('retry-after-ms'):
+                return float(ms) / 1000.0
+        
+        # 3. Parse Gemini SDK error message for retry delay
+        # Gemini errors contain: "Please retry in 12.579418093s."
+        error_str = str(exception)
+        retry_match = re.search(r'retry in ([\d.]+)s', error_str, re.IGNORECASE)
+        if retry_match:
+            retry_seconds = float(retry_match.group(1))
+            logger.debug(f"Parsed retry delay from Gemini error: {retry_seconds}s")
+            return retry_seconds
+        
+        # 4. Parse retryDelay from JSON error body (format: '12s' or '12.5s')
+        # Gemini errors contain: {'retryDelay': '12s'}
+        delay_match = re.search(r"'retryDelay':\s*'([\d.]+)s'", error_str)
+        if delay_match:
+            retry_seconds = float(delay_match.group(1))
+            logger.debug(f"Parsed retryDelay from error body: {retry_seconds}s")
+            return retry_seconds
+            
+    except Exception as e:
+        logger.debug(f"Failed to parse retry-after: {e}")
     return 0.0
 
 def custom_wait_generator(retry_state: RetryCallState) -> float:
@@ -197,11 +250,16 @@ async def safe_api_call(
     Fails fast on quota exhaustion (don't retry quota errors).
     """
     
+    # Build list of retryable exceptions (include Gemini SDK errors if available)
+    retryable_exceptions = [ResourceExhausted, TooManyRequests, ServiceUnavailable, InternalServerError]
+    if GeminiClientError is not None:
+        retryable_exceptions.append(GeminiClientError)
+    
     # Define retry logic
     retryer = AsyncRetrying(
         stop=stop_after_attempt(settings.RETRY_MAX_ATTEMPTS),
-        wait=custom_wait_generator, # Uses our clean wait logic
-        retry=retry_if_exception_type((ResourceExhausted, TooManyRequests, ServiceUnavailable, InternalServerError)),
+        wait=custom_wait_generator,  # Uses our clean wait logic
+        retry=retry_if_exception_type(tuple(retryable_exceptions)),
         before_sleep=before_sleep_log(logger, logging.INFO),
         reraise=True
     )
@@ -222,32 +280,55 @@ async def safe_api_call(
                 return await func(*args, **kwargs)
             
             except (ResourceExhausted, TooManyRequests) as e:
-                # STEP C: Detect if this is a quota error or a transient rate limit
-                error_message = str(e).lower()
-                
-                # Quota error keywords that indicate hard quota limits (not transient)
-                quota_keywords = ['quota', 'daily', 'limit exceeded', 'billing', 'plan']
-                is_quota_error = any(keyword in error_message for keyword in quota_keywords)
-                
-                if is_quota_error:
-                    # Hard quota limit - fail immediately
-                    logger.error(
-                        f"🚫 API quota exhausted for {service}. "
-                        f"Error: {str(e)[:200]}... "
-                        f"This is a hard limit that won't resolve with retries."
-                    )
-                    # Re-raise as a RuntimeError to skip retry logic
-                    raise RuntimeError(
-                        f"API quota exhausted for {service}. Check your billing/plan. "
-                        f"Original error: {str(e)[:300]}"
-                    ) from e
-                else:
-                    # Transient rate limit - update global state and retry
-                    wait_time = parse_retry_after(e) or settings.RETRY_MIN_QUOTA_DELAY
-                    await rate_limiter.block_service(service, wait_time)
-                    logger.warning(
-                        f"⚠️ Transient rate limit for {service}. "
-                        f"Will retry after {wait_time}s..."
-                    )
-                    # Re-raise to trigger retry
+                # STEP C: Handle rate limit errors
+                await _handle_rate_limit_error(e, service)
+                raise e
+            except Exception as e:
+                # STEP D: Check if this is a Gemini SDK error (429)
+                if GeminiClientError is not None and isinstance(e, GeminiClientError):
+                    await _handle_rate_limit_error(e, service)
                     raise e
+                # Other exceptions - just re-raise
+                raise
+
+
+async def _handle_rate_limit_error(e: Exception, service: str) -> None:
+    """
+    Smart handling of rate limit errors:
+    - If server provides a short retry delay (< 60s), it's a transient RPM limit -> retry
+    - If no retry delay or very long delay, it's likely a hard quota limit -> fail fast
+    """
+    error_message = str(e).lower()
+    retry_delay = parse_retry_after(e)
+    
+    # Check for hard quota indicators (billing issues, upgrade required, etc.)
+    hard_quota_keywords = ['billing', 'upgrade', 'daily limit']
+    is_hard_quota = any(keyword in error_message for keyword in hard_quota_keywords)
+    
+    # Hard quota with no reasonable retry delay -> fail fast
+    if is_hard_quota or (retry_delay == 0 and 'quota' in error_message):
+        await rate_limiter.mark_quota_exhausted(service)
+        logger.error(
+            f"🚫 API quota exhausted for {service}. "
+            f"Error: {str(e)[:200]}... "
+            f"This is a hard limit that won't resolve with retries."
+        )
+        raise RuntimeError(
+            f"API quota exhausted for {service}. Check your billing/plan. "
+            f"Original error: {str(e)[:300]}"
+        ) from e
+    
+    # Transient rate limit -> block service and retry after delay
+    wait_time = retry_delay if retry_delay > 0 else settings.RETRY_MIN_QUOTA_DELAY
+    await rate_limiter.block_service(service, wait_time)
+    
+    if retry_delay > 0:
+        logger.warning(
+            f"⚠️ Rate limit for {service}. Server says retry in {wait_time:.1f}s. "
+            f"Blocking service and will retry..."
+        )
+    else:
+        logger.warning(
+            f"⚠️ Rate limit for {service} (no retry delay specified). "
+            f"Using default delay of {wait_time}s..."
+        )

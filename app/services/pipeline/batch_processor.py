@@ -10,12 +10,12 @@ Follows Single Responsibility Principle - focuses only on batch processing.
 """
 import asyncio
 import logging
-from typing import List, Any
+from typing import List
 
 from app.schemas.interview import AllSkillSources
 from app.services.tools.source_discovery import discover_sources
-from app.core.prompts import generate_questions_prompt
 from app.services.pipeline.llm_service import LLMService
+from app.core.prompts import generate_questions_prompt, generate_contextfree_questions_prompt
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,8 @@ class BatchProcessor:
             total_batches: Total number of batches for logging
         """
         batch_label = f"Batch {batch_index}/{total_batches}"
+        batch_outcome = "failure"  # Track outcome: 'success', 'partial', or 'failure'
+        skills_processed = 0
         
         async with self.semaphore:
             try:
@@ -80,11 +82,10 @@ class BatchProcessor:
                 skills_with_missing_sources = []
                 for skill in batch_skills:
                     has_source = False
-                    if hasattr(sources, 'all_sources'):
-                        for source_item in sources.all_sources:
-                            if source_item.skill == skill and source_item.extracted_content and source_item.extracted_content.strip():
-                                has_source = True
-                                break
+                    for source_item in sources.all_sources:
+                        if source_item.skill == skill and source_item.extracted_content and source_item.extracted_content.strip():
+                            has_source = True
+                            break
                     if not has_source:
                         skills_with_missing_sources.append(skill)
                 
@@ -110,32 +111,97 @@ class BatchProcessor:
                         self.logger.info(f"[{batch_label}] {len(skills_with_sources)} skills with sources will use context-based prompts: {skills_with_sources}")
                     
                     # Process skills with sources as a batch (if any) - delegate to recursive processor
+                    count_with_sources = 0
                     if skills_with_sources:
-                        await self._process_recursive_batch(skills_with_sources, sources, batch_label)
+                        count_with_sources = await self._process_recursive_batch(skills_with_sources, sources, batch_label)
                     
                     # Process skills without sources in parallel with context-free prompt
+                    contextfree_results = []
                     if skills_with_missing_sources:
-                        await asyncio.gather(*[
+                        contextfree_results = await asyncio.gather(*[
                             self._process_contextfree_skill(skill, batch_label)
                             for skill in skills_with_missing_sources
                         ])
+                    
+                    # Count successful context-free skills
+                    count_contextfree = sum(1 for success in contextfree_results if success)
+                    skills_processed = count_with_sources + count_contextfree
                 else:
                     # All skills have sources - delegate to recursive processor
-                    await self._process_recursive_batch(batch_skills, sources, batch_label)
+                    skills_processed = await self._process_recursive_batch(batch_skills, sources, batch_label)
+                
+                # Determine batch outcome
+                if skills_processed == len(batch_skills):
+                    batch_outcome = "success"
+                elif skills_processed > 0:
+                    batch_outcome = "partial"
+                else:
+                    batch_outcome = "failure"
 
             except Exception as e:
                 self.logger.error(f"[{batch_label}] Pipeline error: {e}", exc_info=True)
+                batch_outcome = "failure"
+                skills_processed = 0
+                
+                # Detect quota exhaustion errors (from rate_limiter.py RuntimeError)
+                # Need to check the full exception chain since SourceDiscoveryError wraps the original error
+                def check_quota_error(exc):
+                    """Check exception and its cause chain for quota-related keywords."""
+                    quota_keywords = ["quota exhausted", "daily limit", "quota resets", "resource_exhausted"]
+                    while exc is not None:
+                        error_text = str(exc).lower()
+                        if any(keyword in error_text for keyword in quota_keywords):
+                            return True
+                        exc = exc.__cause__
+                    return False
+                
+                is_quota_error = check_quota_error(e)
+                
+                if is_quota_error:
+                    # Emit distinct quota_error event for clear UI messaging
+                    self.logger.warning(f"[{batch_label}] Quota exhaustion detected - notifying UI")
+                    await self.event_queue.put({
+                        "type": "quota_error",
+                        "content": {
+                            "error": str(e),
+                            "error_type": "QuotaExhausted",
+                            "user_message": (
+                                "The LLM provider has reached its API request limit. "
+                                "This is not a system error. Please try again later or contact support."
+                            ),
+                            "batch_index": batch_index
+                        }
+                    })
+                else:
+                    # Generic error handling
+                    await self.event_queue.put({
+                        "type": "error",
+                        "content": {
+                            "error": f"Batch {batch_index} failed: {e}",
+                            "error_type": type(e).__name__
+                        }
+                    })
+            finally:
+                # Send distinct completion event based on outcome
+                event_type = f"batch_{batch_outcome}"
+                completion_msg = {
+                    "success": f"✅ {batch_label} SUCCESS: {skills_processed}/{len(batch_skills)} skills",
+                    "partial": f"⚠️  {batch_label} PARTIAL: {skills_processed}/{len(batch_skills)} skills",
+                    "failure": f"❌ {batch_label} FAILED: 0/{len(batch_skills)} skills"
+                }
+                
+                self.logger.info(completion_msg[batch_outcome])
                 await self.event_queue.put({
-                    "type": "error",
+                    "type": event_type,
                     "content": {
-                        "error": f"Batch {batch_index} failed: {e}",
-                        "error_type": type(e).__name__
+                        "batch_index": batch_index,
+                        "total_skills": len(batch_skills),
+                        "processed_skills": skills_processed,
+                        "outcome": batch_outcome
                     }
                 })
-            finally:
-                await self.event_queue.put({"type": "batch_complete", "content": None})
     
-    async def _process_recursive_batch(self, skills: List[str], sources: AllSkillSources, batch_label: str):
+    async def _process_recursive_batch(self, skills: List[str], sources: AllSkillSources, batch_label: str) -> int:
         """
         Recursively process a batch of skills with token-aware splitting.
         
@@ -147,6 +213,9 @@ class BatchProcessor:
             skills: List of skills to process
             sources: All source data
             batch_label: Label for logging
+            
+        Returns:
+            Number of skills successfully processed
         """
         # Build context and check tokens
         context_str = self._build_context(sources, skills)
@@ -157,25 +226,27 @@ class BatchProcessor:
         
         if token_estimate > safe_limit:
             # Exceeds limit - use splitting strategy
-            await self._process_with_splitting(skills, sources, batch_label)
+            return await self._process_with_splitting(skills, sources, batch_label)
         else:
             # Fits within limit - process as batch
             if token_estimate > 0.8 * safe_limit:
                 self.logger.warning(f"[{batch_label}] WARNING: Batch context is reaching limit ({token_estimate}/{safe_limit})")
-            await self._process_batch_questions(skills, context_str, batch_label)
+            return await self._process_batch_questions(skills, context_str, batch_label)
     
-    async def _process_with_splitting(self, skills: List[str], sources: AllSkillSources, batch_label: str):
+    async def _process_with_splitting(self, skills: List[str], sources: AllSkillSources, batch_label: str) -> int:
         """
         Process skills with batch-splitting fallback.
         
         If token limit exceeded, recursively splits batch in half instead of 
         processing per-skill (more efficient, fewer API calls).
+        
+        Returns:
+            Number of skills successfully processed
         """
-        if len(skills) <= 1:
+        if len(skills) == 1:
             # Single skill - process individually
-            for skill in skills:
-                await self._process_single_skill(skill, sources, batch_label)
-            return
+            success = await self._process_single_skill(skills[0], sources, batch_label)
+            return 1 if success else 0
         
         # Build context for current skill set
         context_str = self._build_context(sources, skills)
@@ -185,7 +256,7 @@ class BatchProcessor:
         if token_estimate <= safe_limit:
             # Fits within limit - process as batch
             self.logger.info(f"[{batch_label}] Split batch fits: {len(skills)} skills, {token_estimate} tokens")
-            await self._process_batch_questions(skills, context_str, batch_label)
+            return await self._process_batch_questions(skills, context_str, batch_label)
         else:
             # Still too large - split in half and recurse
             mid = len(skills) // 2
@@ -194,8 +265,9 @@ class BatchProcessor:
             
             self.logger.info(f"[{batch_label}] Splitting batch: {len(skills)} -> {len(left_half)} + {len(right_half)}")
             
-            await self._process_with_splitting(left_half, sources, f"{batch_label}-L")
-            await self._process_with_splitting(right_half, sources, f"{batch_label}-R")
+            left_count = await self._process_with_splitting(left_half, sources, f"{batch_label}-L")
+            right_count = await self._process_with_splitting(right_half, sources, f"{batch_label}-R")
+            return left_count + right_count
     
     def _build_context(self, sources: AllSkillSources, skills: List[str] = None) -> str:
         """
@@ -230,8 +302,69 @@ class BatchProcessor:
         # Return formatted context or fallback message
         return "\n\n---\n\n".join(context_parts) if context_parts else "No technical context available."
     
-    async def _process_single_skill(self, skill: str, sources: AllSkillSources, batch_label: str):
-        """Process questions for a single skill (fallback for large contexts)."""
+    async def _validate_and_queue_results(self, questions_obj, expected_skills: List[str], batch_label: str) -> int:
+        """
+        Validate LLM response completeness and queue results (Count-based validation).
+        
+        Validates that the LLM returned the expected NUMBER of skills.
+        Does NOT validate skill names (LLM may reformat them - hyphens, quotes, etc).
+        The LLM's returned skill names are treated as canonical.
+        
+        Args:
+            questions_obj: Parsed AllInterviewQuestions object from LLM
+            expected_skills: List of skills that were requested (used only for count)
+            batch_label: Label for logging
+            
+        Returns:
+            Number of skills actually processed (0 if complete failure, partial count if incomplete)
+        """
+        if not questions_obj or not hasattr(questions_obj, 'all_questions') or len(questions_obj.all_questions) == 0:
+            # No questions at all - complete failure
+            self.logger.error(
+                f"[{batch_label}] ⚠️ COMPLETE LLM FAILURE! "
+                f"Expected {len(expected_skills)} skills, received 0."
+            )
+            for skill in expected_skills:
+                await self.event_queue.put({
+                    "type": "error",
+                    "content": {"skill": skill, "error": "No questions generated"}
+                })
+            return 0  # Complete failure
+        
+        # COUNT-BASED VALIDATION: Compare counts, not names
+        expected_count = len(expected_skills)
+        received_count = len(questions_obj.all_questions)
+        
+        if received_count < expected_count:
+            # LLM returned fewer skills than expected - this is a real issue
+            received_skill_names = [item.skill for item in questions_obj.all_questions]
+            self.logger.error(
+                f"[{batch_label}] ⚠️ INCOMPLETE LLM RESPONSE! "
+                f"Expected {expected_count} skills, received {received_count}. "
+                f"LLM returned: {received_skill_names}"
+            )
+            
+            # Queue what we got, but mark as incomplete
+            for item in questions_obj.all_questions:
+                result_dict = {"skill": item.skill, "questions": item.questions}
+                await self.event_queue.put({"type": "data", "content": result_dict})
+            
+            return received_count  # Return actual count (partial)
+        
+        # Success: Count matches (trust LLM's skill names as canonical)
+        for item in questions_obj.all_questions:
+            result_dict = {"skill": item.skill, "questions": item.questions}
+            await self.event_queue.put({"type": "data", "content": result_dict})
+        
+        return expected_count  # Return full count (success)
+    
+    async def _process_single_skill(self, skill: str, sources: AllSkillSources, batch_label: str) -> bool:
+        """
+        Process questions for a single skill (fallback for large contexts).
+        
+        Returns:
+            True if skill was successfully processed, False otherwise
+        """
         try:
             # Use unified context builder for single skill
             skill_context = self._build_context(sources, [skill])
@@ -249,18 +382,18 @@ class BatchProcessor:
             self.logger.info(f"[{batch_label}] Processing '{skill}' individually (~{token_est} tokens)")
             
             prompt = generate_questions_prompt(skill, skill_context)
-            questions_obj = await LLMService.generate_questions(prompt, batch_label)
+            questions_obj = await LLMService.generate_questions(
+                prompt, 
+                batch_label,
+                expected_skill_count=1  # Single skill processing
+            )
             
-            if questions_obj and hasattr(questions_obj, 'all_questions') and len(questions_obj.all_questions) > 0:
-                for item in questions_obj.all_questions:
-                    result_dict = {"skill": item.skill, "questions": item.questions}
-                    await self.event_queue.put({"type": "data", "content": result_dict})
-            else:
-                self.logger.warning(f"[{batch_label}] No questions for '{skill}'")
-                await self.event_queue.put({
-                    "type": "error",
-                    "content": {"skill": skill, "error": "No questions generated"}
-                })
+            # Use centralized validation (returns count)
+            processed_count = await self._validate_and_queue_results(questions_obj, [skill], batch_label)
+            if processed_count == 0:
+                self.logger.warning(f"[{batch_label}] Failed to process '{skill}'")
+                return False
+            return True
                 
         except Exception as e:
             self.logger.error(f"[{batch_label}] Error processing '{skill}': {e}", exc_info=True)
@@ -268,31 +401,33 @@ class BatchProcessor:
                 "type": "error",
                 "content": {"skill": skill, "error": str(e)}
             })
+            return False
     
-    async def _process_contextfree_skill(self, skill: str, batch_label: str):
+    async def _process_contextfree_skill(self, skill: str, batch_label: str) -> bool:
         """
         Process a single skill using context-free prompt (no sources available).
         Generates verbal, conceptual technical questions.
+        
+        Returns:
+            True if skill was successfully processed, False otherwise
         """
         try:
             self.logger.info(f"[{batch_label}] Processing '{skill}' with context-free prompt (no sources)")
             
             # Use context-free prompt directly
-            from app.core.prompts import generate_contextfree_questions_prompt
             prompt = generate_contextfree_questions_prompt(skill)
-            questions_obj = await LLMService.generate_questions(prompt, f"{batch_label}-{skill}")
+            questions_obj = await LLMService.generate_questions(
+                prompt, 
+                f"{batch_label}-{skill}",
+                expected_skill_count=1  # Single skill processing
+            )
             
-            if questions_obj and hasattr(questions_obj, 'all_questions') and len(questions_obj.all_questions) > 0:
-                for item in questions_obj.all_questions:
-                    result_dict = {"skill": item.skill, "questions": item.questions}
-                    await self.event_queue.put({"type": "data", "content": result_dict})
-                self.logger.info(f"[{batch_label}] Context-free questions generated for '{skill}'")
-            else:
-                self.logger.warning(f"[{batch_label}] No questions generated for '{skill}'")
-                await self.event_queue.put({
-                    "type": "error",
-                    "content": {"skill": skill, "error": "No questions generated"}
-                })
+            # Use centralized validation (returns count)
+            processed_count = await self._validate_and_queue_results(questions_obj, [skill], batch_label)
+            if processed_count == 0:
+                self.logger.warning(f"[{batch_label}] Failed to process context-free '{skill}'")
+                return False
+            return True
                 
         except Exception as e:
             self.logger.error(f"[{batch_label}] Error processing context-free '{skill}': {e}", exc_info=True)
@@ -300,22 +435,31 @@ class BatchProcessor:
                 "type": "error",
                 "content": {"skill": skill, "error": str(e)}
             })
+            return False
     
-    async def _process_batch_questions(self, batch_skills: List[str], context_str: str, batch_label: str):
-        """Process questions for entire batch."""
-        prompt = generate_questions_prompt(batch_skills, context_str)
-        questions_obj = await LLMService.generate_questions(prompt, batch_label)
+    async def _process_batch_questions(self, batch_skills: List[str], context_str: str, batch_label: str) -> int:
+        """
+        Process questions for entire batch.
         
-        if questions_obj and hasattr(questions_obj, 'all_questions') and len(questions_obj.all_questions) > 0:
-            for item in questions_obj.all_questions:
-                result_dict = {"skill": item.skill, "questions": item.questions}
-                await self.event_queue.put({"type": "data", "content": result_dict})
-            self.logger.info(f"[{batch_label}] Question generation completed")
+        Returns:
+            Number of skills successfully processed
+        """
+        prompt = generate_questions_prompt(batch_skills, context_str)
+        questions_obj = await LLMService.generate_questions(
+            prompt, 
+            batch_label,
+            expected_skill_count=len(batch_skills)  # Expect all batch skills
+        )
+        
+        # Use centralized validation (returns count)
+        processed_count = await self._validate_and_queue_results(questions_obj, batch_skills, batch_label)
+        
+        # Log completion status
+        if processed_count == len(batch_skills):
+            self.logger.info(f"[{batch_label}] Question generation completed successfully")
         else:
-            error_reason = "No questions generated (API may have failed or timed out)"
-            if questions_obj is None:
-                error_reason = "API call failed or timed out"
-            
-            self.logger.error(f"[{batch_label}] {error_reason}")
-            for skill in batch_skills:
-                await self.event_queue.put({"type": "error", "content": {"skill": skill, "error": error_reason}})
+            self.logger.warning(
+                f"[{batch_label}] Question generation completed with incomplete results"
+            )
+        
+        return processed_count

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import List, Any, Dict, Optional
+from typing import Any, Optional
 
 from app.schemas.interview import AllInterviewQuestions
 from app.services.pipeline.llm_parser import parse_llm_response
@@ -53,18 +53,22 @@ class LLMService:
         prompt: str, 
         batch_label: str = "Batch",
         max_retries: int = 3,
-        initial_delay: float = 1.0
+        initial_delay: float = 1.0,
+        expected_skill_count: Optional[int] = None
     ) -> Optional[AllInterviewQuestions]:
         """
         Call LLM to generate questions and parse the result.
         Uses LangChain ChatOpenAI for fast inference (bypasses CrewAI overhead).
         Includes rate limiting and retry logic with exponential backoff.
+        Automatically retries if LLM returns incomplete data (fewer skills than expected).
         
         Args:
             prompt: The prompt to send to the LLM.
             batch_label: Label for logging purposes.
             max_retries: Maximum number of retry attempts (default: 3).
             initial_delay: Initial delay in seconds before first retry (default: 1.0).
+            expected_skill_count: Expected number of skills in response. If provided,
+                                 incomplete responses trigger automatic retry.
             
         Returns:
             Parsed AllInterviewQuestions object or None on failure.
@@ -122,6 +126,19 @@ class LLMService:
                     AllInterviewQuestions,
                     fallback_data=AllInterviewQuestions(all_questions=[])
                 )
+                
+                # Enhanced logging: Show what the LLM actually returned
+                if questions_obj and hasattr(questions_obj, 'all_questions'):
+                    skill_count = len(questions_obj.all_questions)
+                    if skill_count > 0:
+                        skill_names = [item.skill for item in questions_obj.all_questions]
+                        logger.info(
+                            f"[{batch_label}] ✅ Parsed {skill_count} skill(s) from LLM response: {skill_names}"
+                        )
+                    else:
+                        logger.warning(f"[{batch_label}] ⚠️ LLM response parsed but contains 0 skills!")
+                else:
+                    logger.error(f"[{batch_label}] ❌ Failed to parse LLM response!")
                 
                 # Log success after retry
                 if attempt > 0:

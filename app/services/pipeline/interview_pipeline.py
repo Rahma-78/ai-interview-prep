@@ -161,20 +161,42 @@ class InterviewPipeline:
 
             # Consumer loop - yield events as they come
             completed_batches = 0
+            successful_batches = 0
+            partial_batches = 0
+            failed_batches = 0
             all_results = []
+            quota_error_detected = False
             
             while completed_batches < total_batches:
                 event = await event_queue.get()
                 
-                if event["type"] == "batch_complete":
+                # Handle distinct completion events
+                if event["type"] == "batch_success":
+                    successful_batches += 1
                     completed_batches += 1
-                    self.logger.info(f"Progress: {completed_batches}/{total_batches} batches completed")
+                elif event["type"] == "batch_partial":
+                    partial_batches += 1
+                    completed_batches += 1
+                elif event["type"] == "batch_failure":
+                    failed_batches += 1
+                    completed_batches += 1
                 else:
                     if event["type"] == "data":
                         all_results.append(event["content"])
+                    elif event["type"] == "quota_error":
+                        quota_error_detected = True
+                        self.logger.warning("Quota error event received - forwarding to UI")
+                    # Yield all non-completion events to frontend
                     yield event
+            
+            # Log final progress with outcome breakdown
+            self.logger.info(
+                f"Progress: {completed_batches}/{total_batches} batches "
+                f"({successful_batches} success, {partial_batches} partial, {failed_batches} failure)"
+            )
 
             self.logger.info("All batches completed.")
+
             
             # ---------------------------------------------------------
             # 3. Pipeline Complete - Results Ready for Download
