@@ -104,16 +104,21 @@ class ColorFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
-def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bool = False, use_json: bool = False, mask_secrets: bool = True) -> logging.Logger:
+def setup_log_file(clear_log: bool = False):
     """
-    Sets up a logger with console (colored) and file (rotating) handlers.
+    Handles log file creation and clearing.
+    """
+    # Create logs directory if it doesn't exist
+    LOGS_DIR.mkdir(exist_ok=True)
     
-    Args:
-        name: Logger name
-        log_level: Logging level
-        clear_log: If True, clears the log file at startup (useful for fresh runs)
-        use_json: If True, uses JSON formatter for file output
-        mask_secrets: If True, masks sensitive values like API keys in logs
+    log_file = LOGS_DIR / "app.log"
+    
+    if clear_log and log_file.exists():
+         log_file.write_text("")  # Clear file
+
+def configure_logger(name: str = "app", log_level: int = logging.INFO, use_json: bool = False, mask_secrets: bool = True) -> logging.Logger:
+    """
+    Configures the logger handlers and filters.
     """
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
@@ -126,18 +131,7 @@ def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bo
 
     # Prevent adding handlers multiple times
     if logger.hasHandlers():
-        # If clear_log requested and handlers already exist, clear the log file
-        if clear_log:
-            log_file = LOGS_DIR / "app.log"
-            if log_file.exists():
-                log_file.write_text("")  # Clear file
         return logger
-
-    # Clear log file if requested (fresh start)
-    if clear_log:
-        log_file = LOGS_DIR / "app.log"
-        if log_file.exists():
-            log_file.write_text("")  # Truncate log file
 
     # Console Handler with Colors
     console_handler = logging.StreamHandler(sys.stdout)
@@ -171,6 +165,20 @@ def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bo
     logger.addHandler(file_handler)
 
     return logger
+
+def setup_logger(name: str = "app", log_level: int = logging.INFO, clear_log: bool = False, use_json: bool = False, mask_secrets: bool = True) -> logging.Logger:
+    """
+    Sets up a logger with console (colored) and file (rotating) handlers.
+    
+    Args:
+        name: Logger name
+        log_level: Logging level
+        clear_log: If True, clears the log file at startup (useful for fresh runs)
+        use_json: If True, uses JSON formatter for file output
+        mask_secrets: If True, masks sensitive values like API keys in logs
+    """
+    setup_log_file(clear_log)
+    return configure_logger(name, log_level, use_json, mask_secrets)
 
 
 def set_correlation_id(correlation_id: str):

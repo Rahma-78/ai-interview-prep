@@ -96,12 +96,14 @@ def _extract_grounding_metadata(response: Any) -> Optional[Any]:
 
 def _log_response_debug_info(response_text: str, context: str):
     """Log debug information about the Gemini response."""
-    logger.debug(f"Raw Gemini response length: {len(response_text)} chars for {context}")
-    if response_text:
-        preview = response_text[:500].replace('\n', ' ')
-        logger.debug(f"Response preview: {preview}...")
-    else:
-        logger.warning(f"Empty response received from Gemini for {context}")
+    # Lazy evaluation: Only formats string if logging level is valid
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Raw Gemini response length: {len(response_text)} chars for {context}")
+        if response_text:
+             preview = response_text[:500].replace('\n', ' ')
+             logger.debug(f"Response preview: {preview}...")
+        else:
+             logger.warning(f"Empty response received from Gemini for {context}")
 
 
 def _separate_failed_skills(parsed_results: List[Dict]) -> Tuple[List[str], List[Dict]]:

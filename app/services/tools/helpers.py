@@ -203,13 +203,19 @@ def clean_llm_json_output(raw_text: str) -> str:
     text = re.sub(r'```json\s*', '', raw_text)
     text = re.sub(r'```', '', text)
     
+    # Attempt 1: Standard JSON parsing (Fastest)
     try:
-        # Use json_repair to fix malformed JSON
+        decoded_object = json.loads(text)
+        return json.dumps(decoded_object)
+    except json.JSONDecodeError:
+        pass
+    
+    # Attempt 2: json_repair (Slower but robust)
+    try:
         decoded_object = json_repair.loads(text)
-        # Convert back to string for Pydantic validation
         return json.dumps(decoded_object)
     except Exception as e:
-        logger.error(f"Failed to repair JSON: {e}")
+        logger.warning(f"Failed to repair JSON: {e}")
         # Fallback to simple extraction if repair fails
         start_idx = text.find('{')
         end_idx = text.rfind('}')

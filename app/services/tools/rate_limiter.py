@@ -68,75 +68,97 @@ class ServiceRateLimiter:
             async with self._lock:
                 now = datetime.now(timezone.utc)
                 
-                # 0. Check Quota Exhaustion Flag (Fail-Fast)
-                if self._quota_exhausted.get(service, False):
-                    raise RuntimeError(
-                        f"Service {service} quota exhausted by previous API call. "
-                        f"No more requests will be accepted until quota resets."
-                    )
+                # Check all constraints
+                self._check_quota_exhaustion(service)
+                wait_time = self._check_penalty_box(service, now)
                 
-                # 1. Check Penalty Box (Global Hold)
-                if service in self._blocked_until:
-                    if now < self._blocked_until[service]:
-                        wait_time = (self._blocked_until[service] - now).total_seconds()
-                        logger.warning(f"Service {service} is blocked. Waiting {wait_time:.1f}s...")
-                    else:
-                        del self._blocked_until[service]  # Release block
-
-                # 2. Check Daily Quota (if service has a daily limit)
-                if wait_time == 0 and service in self._daily_limits:
-                    daily_history = self._daily_usage[service]
-                    daily_limit = self._daily_limits[service]
-                    
-                    # Remove requests older than 24 hours
-                    while daily_history and daily_history[0] < now - timedelta(hours=24):
-                        daily_history.popleft()
-                    
-                    # Check if we've hit the daily quota
-                    if len(daily_history) >= daily_limit:
-                        # Calculate when the oldest request will expire
-                        oldest_request_expires_at = daily_history[0] + timedelta(hours=24)
-                        wait_seconds = (oldest_request_expires_at - now).total_seconds()
-                        
-                        if wait_seconds > 0:
-                            logger.error(
-                                f"❌ Daily quota EXHAUSTED for {service}! "
-                                f"({len(daily_history)}/{daily_limit} used). "
-                                f"Next slot available in {wait_seconds/3600:.1f} hours."
-                            )
-                            # Don't wait here - raise an exception instead
-                            raise RuntimeError(
-                                f"Daily quota exhausted for {service}. "
-                                f"Used {len(daily_history)}/{daily_limit} requests in last 24h. "
-                                f"Quota resets in {wait_seconds/3600:.1f} hours."
-                            )
-
-                # 3. Check RPM (Sliding Window)
                 if wait_time == 0:
-                    history = self._services[service]
-                    limit = self._rpm_limits.get(service, self._rpm_limits['default'])
-
-                    # Remove requests older than 1 minute
-                    while history and history[0] < now - timedelta(minutes=1):
-                        history.popleft()
-
-                    # If full, wait for the oldest request to expire
-                    if len(history) >= limit:
-                        wait_time = (history[0] + timedelta(minutes=1) - now).total_seconds()
-                        if wait_time > 0:
-                            logger.info(f"Local RPM limit for {service}. Sleeping {wait_time:.2f}s")
-                    else:
-                        # Success! Record and return
-                        self._services[service].append(now)
-                        # Also track for daily quota
-                        if service in self._daily_limits:
-                            self._daily_usage[service].append(now)
-                        return
+                    wait_time = self._check_daily_quota(service, now)
+                
+                if wait_time == 0:
+                    wait_time = self._check_rpm_and_acquire(service, now)
+                    if wait_time == 0:
+                         # Successfully acquired
+                         return
 
             # If we need to wait, sleep OUTSIDE the lock
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
                 # Loop back and try again
+
+    def _check_quota_exhaustion(self, service: str):
+        """Fail-fast if quota is exhausted."""
+        if self._quota_exhausted.get(service, False):
+            raise RuntimeError(
+                f"Service {service} quota exhausted by previous API call. "
+                f"No more requests will be accepted until quota resets."
+            )
+
+    def _check_penalty_box(self, service: str, now: datetime) -> float:
+        """Check if service is in penalty box. Returns wait time in seconds."""
+        if service in self._blocked_until:
+            if now < self._blocked_until[service]:
+                wait_time = (self._blocked_until[service] - now).total_seconds()
+                logger.warning(f"Service {service} is blocked. Waiting {wait_time:.1f}s...")
+                return wait_time
+            else:
+                del self._blocked_until[service]  # Release block
+        return 0.0
+
+    def _check_daily_quota(self, service: str, now: datetime) -> float:
+        """Check daily quota limits. Returns wait time or raises error if exhausted."""
+        if service not in self._daily_limits:
+            return 0.0
+
+        daily_history = self._daily_usage[service]
+        daily_limit = self._daily_limits[service]
+        
+        # Remove requests older than 24 hours
+        while daily_history and daily_history[0] < now - timedelta(hours=24):
+            daily_history.popleft()
+        
+        # Check if we've hit the daily quota
+        if len(daily_history) >= daily_limit:
+            # Calculate when the oldest request will expire
+            oldest_request_expires_at = daily_history[0] + timedelta(hours=24)
+            wait_seconds = (oldest_request_expires_at - now).total_seconds()
+            
+            if wait_seconds > 0:
+                logger.error(
+                    f"❌ Daily quota EXHAUSTED for {service}! "
+                    f"({len(daily_history)}/{daily_limit} used). "
+                    f"Next slot available in {wait_seconds/3600:.1f} hours."
+                )
+                # Don't wait here - raise an exception instead
+                raise RuntimeError(
+                    f"Daily quota exhausted for {service}. "
+                    f"Used {len(daily_history)}/{daily_limit} requests in last 24h. "
+                    f"Quota resets in {wait_seconds/3600:.1f} hours."
+                )
+        return 0.0
+
+    def _check_rpm_and_acquire(self, service: str, now: datetime) -> float:
+        """Check RPM limits and acquire slot if available. Returns wait time in seconds."""
+        history = self._services[service]
+        limit = self._rpm_limits.get(service, self._rpm_limits['default'])
+
+        # Remove requests older than 1 minute
+        while history and history[0] < now - timedelta(minutes=1):
+            history.popleft()
+
+        # If full, wait for the oldest request to expire
+        if len(history) >= limit:
+            wait_time = (history[0] + timedelta(minutes=1) - now).total_seconds()
+            if wait_time > 0:
+                logger.info(f"Local RPM limit for {service}. Sleeping {wait_time:.2f}s")
+                return wait_time
+        
+        # Success! Record and return 0 wait time
+        self._services[service].append(now)
+        # Also track for daily quota
+        if service in self._daily_limits:
+            self._daily_usage[service].append(now)
+        return 0.0
 
     async def block_service(self, service: str, seconds: float):
         """Manually blocks a service (used when we hit a 429/Quota error)."""
@@ -152,7 +174,7 @@ class ServiceRateLimiter:
                 f"🚫 Service {service} marked as QUOTA EXHAUSTED. "
                 f"All future requests will fail immediately until quota resets."
             )
-    
+
     def get_daily_usage(self, service: str) -> tuple[int, int]:
         """Returns (current_usage, daily_limit) for a service."""
         if service not in self._daily_limits:

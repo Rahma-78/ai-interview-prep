@@ -2,7 +2,7 @@ import asyncio
 import logging
 import json
 import os
-import shutil
+
 import traceback
 from typing import List, Dict, Any
 from datetime import datetime
@@ -91,7 +91,8 @@ async def generate_interview_questions(
     try:
         # Step 1: Save uploaded file
         with open(file_location, "wb") as buffer:
-            await asyncio.to_thread(shutil.copyfileobj, resume_file.file, buffer)
+            content = await resume_file.read()
+            buffer.write(content)
         file_saved = True
         
         # Step 2: Validate file immediately (fail fast)
@@ -134,6 +135,7 @@ async def generate_interview_questions(
                         # Stream quota error with distinct type for frontend
                         error_data = event["content"]
                         data = {
+                            "type": "quota_error",
                             "skill": "LLM Quota Limit",
                             "error": error_data.get("user_message", "API quota exceeded"),
                             "error_type": "quota_exhausted",

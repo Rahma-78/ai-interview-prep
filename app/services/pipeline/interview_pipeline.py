@@ -66,41 +66,26 @@ class InterviewPipeline:
     @log_async_execution_time
     async def run_async_generator(self):
         """
-        Run the pipeline with parallel processing and global timeout.
+        Run the pipeline with parallel processing.
         Yields events as they happen for true streaming.
         """
         # Ensure correlation ID is set for this execution context
         set_correlation_id(self.correlation_id)
         
         try:
-            # Wrap entire pipeline in global timeout
-            gen = self._pipeline_execution()
-            loop = asyncio.get_running_loop()
-            end_time = loop.time() + settings.GLOBAL_TIMEOUT_SECONDS
-
-            while True:
-                remaining_time = end_time - loop.time()
-                if remaining_time <= 0:
-                    raise asyncio.TimeoutError()
+            # Run pipeline directly without global timeout wrapper
+            # Individual services (LLM, Search) have their own timeouts
+            async for event in self._pipeline_execution():
+                yield event
                 
-                try:
-                    event = await asyncio.wait_for(gen.__anext__(), timeout=remaining_time)
-                    yield event
-                except StopAsyncIteration:
-                    break
-                
-        except asyncio.TimeoutError:
-            error_msg = f"Pipeline execution exceeded {settings.GLOBAL_TIMEOUT_SECONDS}s timeout"
-            self.logger.error(error_msg)
-            yield {
-                "type": "error",
-                "content": {
-                    "error": error_msg,
-                    "error_type": "PipelineTimeoutError"
-                }
-            }
         except Exception as e:
-            self.logger.error(f"Error in run_async_generator: {e}", exc_info=True)
+            # Optimize logging: Avoid stack trace for expected pipeline interruptions
+            error_msg = str(e).lower()
+            if "quota" in error_msg or "rate limit" in error_msg:
+                 self.logger.error(f"Pipeline stopped due to quota/rate limit: {e}")
+            else:
+                 self.logger.error(f"Error in run_async_generator: {e}", exc_info=True)
+            
             yield {
                 "type": "error",
                 "content": {

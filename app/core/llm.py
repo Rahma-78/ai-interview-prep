@@ -48,12 +48,5 @@ def get_genai_client() -> genai.Client:
         _genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
     return _genai_client
 
-# Pre-initialize on module load (moves blocking to startup, not first request)
-try:
-    _genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-except Exception as e:
-    import logging
-    logging.getLogger(__name__).warning(f"GenAI client pre-initialization failed: {e}")
-
 # Model constant for source discovery
 GEMINI_MODEL = 'gemini-2.5-flash'

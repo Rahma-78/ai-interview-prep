@@ -25,32 +25,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalBatches = 0;
     let completedBatches = 0;
 
+    const messageHandlers = {
+        'step_1': () => updateProgress(1),
+        'step_2': () => updateProgress(2),
+        'step_2_complete': () => {
+            document.querySelectorAll('.step')[1].classList.add('completed');
+            document.querySelectorAll('.step')[1].classList.remove('active');
+        },
+        'step_3': () => {
+            updateProgress(3);
+            completedBatches = 0;
+        }
+    };
+
     ws.onmessage = (event) => {
         const message = event.data;
 
-        // Handle standard step transitions
-        if (message === 'step_1') {
-            updateProgress(1);
-        } else if (message === 'step_2') {
-            updateProgress(2);
-        } else if (message === 'step_2_complete') {
-            // Mark step 2 as completed (green) when sources are actually found
-            document.querySelectorAll('.step')[1].classList.add('completed');
-            document.querySelectorAll('.step')[1].classList.remove('active');
-        } else if (message === 'step_3') {
-            updateProgress(3);
-            // Reset batch tracking
-            completedBatches = 0;
+        if (messageHandlers[message]) {
+            messageHandlers[message]();
         } else {
             // Handle granular status updates
             if (loadingText) {
-                // Extract batch info if present (format: "Processing Batch X/Y...")
+                // Extract batch info if present
                 const batchMatch = message.match(/Batch (\d+)\/(\d+)/);
                 if (batchMatch) {
                     const currentBatch = parseInt(batchMatch[1]);
                     totalBatches = parseInt(batchMatch[2]);
 
-                    // Update progress bar based on batch completion
                     if (message.includes('Completed') || message.includes('Generated questions')) {
                         completedBatches = Math.min(completedBatches + 1, totalBatches);
                         const progress = Math.round((completedBatches / totalBatches) * 100);

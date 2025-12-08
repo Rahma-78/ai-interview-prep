@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
-from dotenv import dotenv_values, load_dotenv
+from dotenv import load_dotenv
 
 
 

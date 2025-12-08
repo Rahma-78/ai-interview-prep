@@ -139,23 +139,22 @@ class BatchProcessor:
                     batch_outcome = "failure"
 
             except Exception as e:
-                self.logger.error(f"[{batch_label}] Pipeline error: {e}", exc_info=True)
+                # Optimized Logging: Don't dump stack traces for known operational errors
+                error_text = str(e).lower()
+                is_quota_error = any(k in error_text for k in ["quota exhausted", "daily limit", "resource_exhausted"]) or \
+                                 any(k in str(e.__cause__).lower() for k in ["quota exhausted", "daily limit", "resource_exhausted"] if e.__cause__)
+                
+                if is_quota_error:
+                    self.logger.warning(f"[{batch_label}] Quota exhaustion detected ({str(e)[:100]}...)")
+                elif "source discovery failed" in error_text:
+                     # This is a known operational error from source_discovery
+                    self.logger.error(f"[{batch_label}] Pipeline error: {e}")
+                else:
+                    # Unexpected crash - log full traceback
+                    self.logger.error(f"[{batch_label}] Unexpected Pipeline Error: {e}", exc_info=True)
+
                 batch_outcome = "failure"
                 skills_processed = 0
-                
-                # Detect quota exhaustion errors (from rate_limiter.py RuntimeError)
-                # Need to check the full exception chain since SourceDiscoveryError wraps the original error
-                def check_quota_error(exc):
-                    """Check exception and its cause chain for quota-related keywords."""
-                    quota_keywords = ["quota exhausted", "daily limit", "quota resets", "resource_exhausted"]
-                    while exc is not None:
-                        error_text = str(exc).lower()
-                        if any(keyword in error_text for keyword in quota_keywords):
-                            return True
-                        exc = exc.__cause__
-                    return False
-                
-                is_quota_error = check_quota_error(e)
                 
                 if is_quota_error:
                     # Emit distinct quota_error event for clear UI messaging
@@ -235,39 +234,48 @@ class BatchProcessor:
     
     async def _process_with_splitting(self, skills: List[str], sources: AllSkillSources, batch_label: str) -> int:
         """
-        Process skills with batch-splitting fallback.
-        
-        If token limit exceeded, recursively splits batch in half instead of 
-        processing per-skill (more efficient, fewer API calls).
-        
-        Returns:
-            Number of skills successfully processed
+        Process skills with batch-splitting fallback using an ITERATIVE stack-based approach.
+        This prevents potential stack overflow with deeply nested recursive calls.
         """
-        if len(skills) == 1:
-            # Single skill - process individually
-            success = await self._process_single_skill(skills[0], sources, batch_label)
-            return 1 if success else 0
+        total_processed = 0
+        stack = [(skills, batch_label)]
         
-        # Build context for current skill set
-        context_str = self._build_context(sources, skills)
-        token_estimate = LLMService.estimate_tokens(context_str)
-        safe_limit = LLMService.get_safe_token_limit()
-        
-        if token_estimate <= safe_limit:
-            # Fits within limit - process as batch
-            self.logger.info(f"[{batch_label}] Split batch fits: {len(skills)} skills, {token_estimate} tokens")
-            return await self._process_batch_questions(skills, context_str, batch_label)
-        else:
-            # Still too large - split in half and recurse
-            mid = len(skills) // 2
-            left_half = skills[:mid]
-            right_half = skills[mid:]
+        while stack:
+            current_skills, current_label = stack.pop()
             
-            self.logger.info(f"[{batch_label}] Splitting batch: {len(skills)} -> {len(left_half)} + {len(right_half)}")
+            if not current_skills:
+                continue
+                
+            if len(current_skills) == 1:
+                # Base case: process single skill
+                success = await self._process_single_skill(current_skills[0], sources, current_label)
+                if success:
+                    total_processed += 1
+                continue
             
-            left_count = await self._process_with_splitting(left_half, sources, f"{batch_label}-L")
-            right_count = await self._process_with_splitting(right_half, sources, f"{batch_label}-R")
-            return left_count + right_count
+            # Build context for current chunk
+            context_str = self._build_context(sources, current_skills)
+            token_estimate = LLMService.estimate_tokens(context_str)
+            safe_limit = LLMService.get_safe_token_limit()
+            
+            if token_estimate <= safe_limit:
+                # Fits within limit -> Process as batch
+                self.logger.info(f"[{current_label}] Split batch fits: {len(current_skills)} skills, {token_estimate} tokens")
+                count = await self._process_batch_questions(current_skills, context_str, current_label)
+                total_processed += count
+            else:
+                # Too large -> Split and push to stack
+                mid = len(current_skills) // 2
+                left_half = current_skills[:mid]
+                right_half = current_skills[mid:]
+                
+                self.logger.info(f"[{current_label}] Splitting batch: {len(current_skills)} -> {len(left_half)} + {len(right_half)}")
+                
+                # Push right half first so left half is processed first (LIFO)
+                stack.append((right_half, f"{current_label}-R"))
+                stack.append((left_half, f"{current_label}-L"))
+                
+        return total_processed
     
     def _build_context(self, sources: AllSkillSources, skills: List[str] = None) -> str:
         """

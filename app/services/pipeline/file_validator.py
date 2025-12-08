@@ -88,7 +88,10 @@ class FileValidator:
             )
         
         # Validate MIME type via magic bytes (skip for .txt)
-        if extension != '.txt':
+        if extension == '.txt':
+            # Text files don't have consistent magic bytes, skip check
+            pass
+        else:
             self._validate_mime_type(path, extension)
         
         self.logger.info(f"Resume validation passed: {file_path} ({file_size / 1024:.1f}KB)")

@@ -66,13 +66,6 @@ def file_text_extractor(file_path: str) -> str:
         return f"An error occurred while reading the PDF: {str(e)}"
 
 
-async def grounded_source_discoverer(skills: List[str]) -> Dict:
-    """
-    Asynchronously retrieves Gemini's native search response for a list of skills.
-    This function returns the raw Gemini response text for each skill,
-    providing context for question generation by the third agent.
-    """
-    results = await discover_sources(skills)
-    return {"all_sources": results}
+
 
 
