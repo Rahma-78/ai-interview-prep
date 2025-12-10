@@ -152,14 +152,16 @@ async def _call_gemini_api(
     logger.info(f"⏱️ Gemini API call started for {context}")
     start_time = time.perf_counter()
     
-    response = await safe_api_call(
-        asyncio.to_thread,
-        client.models.generate_content,
-        service='gemini',
-        model=GEMINI_MODEL,
-        contents=prompt,
-        config=config
-    )
+    # Create async wrapper for synchronous Gemini SDK call
+    async def _async_wrapper():
+        return await asyncio.to_thread(
+            client.models.generate_content,
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=config
+        )
+    
+    response = await safe_api_call(_async_wrapper, service='gemini')
     
     elapsed = time.perf_counter() - start_time
     logger.info(f"⏱️ Gemini API call completed in {elapsed:.2f}s for {context}")

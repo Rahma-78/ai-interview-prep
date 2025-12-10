@@ -9,8 +9,8 @@ __pycache__/
 venv/
 
 # Project-Specific
-# logs/
-# *.log
+logs/
+*.log
 app/data/
 
 # VS Code

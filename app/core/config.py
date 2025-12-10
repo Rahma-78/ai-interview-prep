@@ -25,19 +25,20 @@ class Settings(BaseSettings):
     DEBUG_MODE: bool = False
    
 
+
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    OPENROUTER_API_KEY: str = ""
+
    
     
     # Service Specific Limits (Requests Per Minute)
-    GEMINI_RPM: int = 15
+    GEMINI_RPM: int = 5
     GROQ_RPM: int = 60
-    OPENROUTER_RPM: int = 20  # Conservative limit for OpenRouter API
+    # Note: Groq handles both LLaMA 3.3 70B and GPT-OSS 120B models
     
-    # Service Specific Daily Limits
-    GEMINI_DAILY_LIMIT: int = 20
-    GROQ_DAILY_LIMIT: int = 1000  
+    # Note: Daily limits removed - each API enforces its own quotas
+    # Gemini free tier: 20 requests/day (enforced by API with 429 error)
+    # Groq: 14,400 requests/day (enforced by API)
     
     # Retry Configuration
     RETRY_MAX_ATTEMPTS: int = 3
@@ -52,7 +53,6 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_BATCHES: int = 3
     SOURCE_DISCOVERY_CONCURRENCY: int = 3
     MAX_SOURCES_PER_SKILL: int = 3  # Maximum sources per skill for quality
-    MAX_CONCURRENT_QUESTION_GEN: int = 3  # Allow 3 concurrent question generation (matches batch count)
     
     # Performance Optimization
     GEMINI_BATCH_STAGGER_DELAY: float = 0.5  # Delay between concurrent Gemini batch starts (seconds)
@@ -61,12 +61,8 @@ class Settings(BaseSettings):
     # Timeout Configuration (seconds)
     GLOBAL_TIMEOUT_SECONDS: int = 600  # 10 minutes
     
-    # Streaming Configuration
-    ENABLE_STREAMING: bool = True  # Use async streaming for LLM calls (eliminates timeouts)
-    STREAM_CHUNK_TIMEOUT: int = 30  # Timeout per chunk (not total duration)
-    
     # Token Management
-    SAFE_TOKEN_LIMIT: int = 50000  # Safe input threshold for OpenRouter gpt-oss-120b
+    SAFE_TOKEN_LIMIT: int = 50000  # Safe input threshold for question generation
     
     # File Upload Limits
     MAX_FILE_SIZE_MB: int = 10  # Maximum resume file size in MB

@@ -64,8 +64,6 @@ class InterviewPipeline:
         Run the pipeline with parallel processing.
         Yields events as they happen for true streaming.
         """
-        # Ensure correlation ID is set for this execution context
-        set_correlation_id(self.correlation_id)
         
         try:
             # Run pipeline directly without global timeout wrapper
@@ -122,9 +120,8 @@ class InterviewPipeline:
             # ---------------------------------------------------------
             # 2. Process Skills in Batches (Pipeline Architecture)
             # ---------------------------------------------------------
-            # Step transitions will be sent by batch_processor when processing actually starts
-
-
+            yield {"type": "status", "content": "step_2"}
+            
             BATCH_SIZE = settings.BATCH_SIZE
             skill_batches = [skills_list[i:i + BATCH_SIZE] for i in range(0, len(skills_list), BATCH_SIZE)]
             total_batches = len(skill_batches)
@@ -137,10 +134,18 @@ class InterviewPipeline:
 
             # Start all pipelines concurrently with staggering to reduce Gemini API contention
             self.logger.info("Starting concurrent batch pipelines...")
+            
+            # Emit step_3 when first batch starts (question generation phase)
+            first_batch_started = False
+            
             for i, batch in enumerate(skill_batches):
                 # Stagger batch starts to prevent simultaneous Gemini API hits (performance optimization)
                 if i > 0:
                     await asyncio.sleep(settings.GEMINI_BATCH_STAGGER_DELAY)
+                else:
+                    # First batch starting - emit step_3
+                    yield {"type": "status", "content": "step_3"}
+                    first_batch_started = True
                 asyncio.create_task(batch_processor.process_batch(i + 1, batch, total_batches))
 
             # Consumer loop - stream events as they come

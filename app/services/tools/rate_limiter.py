@@ -4,25 +4,31 @@ import logging
 import re
 from collections import deque, defaultdict
 from datetime import datetime, timezone, timedelta
-from typing import Callable, Any, Dict
-from email.utils import parsedate_to_datetime
+from typing import Callable, Any, Dict, Optional, Tuple
 
 from google.api_core.exceptions import (
     ResourceExhausted, ServiceUnavailable, TooManyRequests, InternalServerError
 )
 try:
-    from google.genai.errors import ClientError as GeminiClientError
+    from google.genai.errors import ClientError as GeminiClientError, ServerError
+    GEMINI_ERRORS_AVAILABLE = True
 except ImportError:
+    GEMINI_ERRORS_AVAILABLE = False
     GeminiClientError = None
+    ServerError = None
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Error message constants
+ERR_QUOTA_EXHAUSTED = "quota exhausted"
+ERR_MODEL_OVERLOADED = "model overloaded"
+ERR_BILLING_REQUIRED = "billing/plan upgrade required"
 
 class ServiceRateLimiter:
     """
-    Simple rate limiter handling RPM and daily quotas.
+    Simple rate limiter handling RPM limits.
     """
     def __init__(self):
         # RPM tracking (sliding window - last 1 minute)
@@ -30,147 +36,67 @@ class ServiceRateLimiter:
         self._rpm_limits = {
             'gemini': settings.GEMINI_RPM,
             'groq': settings.GROQ_RPM,
-            'openrouter': settings.OPENROUTER_RPM,
             'default': settings.GEMINI_RPM
         }
-        
-        # Daily quota tracking (sliding window - last 24 hours)
-        self._daily_usage: Dict[str, deque] = defaultdict(deque)
-        self._daily_limits = {
-            'gemini': settings.GEMINI_DAILY_LIMIT,
-            'groq': settings.GROQ_DAILY_LIMIT,
-        }
-        
-        # Concurrency semaphores for controlled parallelism (DRY: single initialization point)
-        self._semaphores: Dict[str, asyncio.Semaphore] = {
-            'openrouter': asyncio.Semaphore(settings.MAX_CONCURRENT_QUESTION_GEN),
-        }
-        
         self._lock = asyncio.Lock()
 
-    async def acquire_slot(self, service: str):
-        """Blocks until a slot is available for the given service."""
+    async def acquire_slot(self, service: str) -> None:
+        """Blocks until a slot is available for the given service (RPM only)."""
         while True:
             async with self._lock:
-                now = datetime.now(timezone.utc)
-                
-                # Check daily quota first
-                wait_time = self._check_daily_quota(service, now)
+                wait_time = self._check_rpm(service, datetime.now(timezone.utc))
                 if wait_time == 0:
-                    # Check RPM and acquire
-                    wait_time = self._check_rpm_and_acquire(service, now)
-                    if wait_time == 0:
-                        return  # Successfully acquired
+                    return
 
-            # Sleep outside the lock
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
 
-    def _check_daily_quota(self, service: str, now: datetime) -> float:
-        """Check daily quota limits. Raises error if exhausted."""
-        if service not in self._daily_limits:
-            return 0.0
-
-        daily_history = self._daily_usage[service]
-        daily_limit = self._daily_limits[service]
-        
-        # Remove requests older than 24 hours
-        while daily_history and daily_history[0] < now - timedelta(hours=24):
-            daily_history.popleft()
-        
-        # Check if quota exhausted
-        if len(daily_history) >= daily_limit:
-            oldest_request_expires_at = daily_history[0] + timedelta(hours=24)
-            wait_seconds = (oldest_request_expires_at - now).total_seconds()
-            
-            if wait_seconds > 0:
-                logger.error(
-                    f"Daily quota EXHAUSTED for {service}! "
-                    f"({len(daily_history)}/{daily_limit} used). "
-                    f"Next slot available in {wait_seconds/3600:.1f} hours."
-                )
-                raise RuntimeError(
-                    f"Daily quota exhausted for {service}. "
-                    f"Used {len(daily_history)}/{daily_limit} requests in last 24h. "
-                    f"Quota resets in {wait_seconds/3600:.1f} hours."
-                )
-        return 0.0
-
-    def _check_rpm_and_acquire(self, service: str, now: datetime) -> float:
-        """Check RPM limits and acquire slot if available."""
+    def _check_rpm(self, service: str, now: datetime) -> float:
+        """Check RPM limits and return wait time if needed."""
         history = self._services[service]
         limit = self._rpm_limits.get(service, self._rpm_limits['default'])
 
-        # Remove requests older than 1 minute
+        # Cleanup old requests
         while history and history[0] < now - timedelta(minutes=1):
             history.popleft()
 
-        # If full, wait for the oldest request to expire
+        # Check limit
         if len(history) >= limit:
             wait_time = (history[0] + timedelta(minutes=1) - now).total_seconds()
             if wait_time > 0:
-                logger.info(f"RPM limit for {service}. Waiting {wait_time:.2f}s")
+                logger.debug(f"RPM limit for {service}. Waiting {wait_time:.2f}s")
                 return wait_time
         
-        # Record the request
-        self._services[service].append(now)
-        if service in self._daily_limits:
-            self._daily_usage[service].append(now)
+        history.append(now)
         return 0.0
-
-    def get_daily_usage(self, service: str) -> tuple[int, int]:
-        """Returns (current_usage, daily_limit) for a service."""
-        if service not in self._daily_limits:
-            return (0, 0)
-        
-        now = datetime.now(timezone.utc)
-        daily_history = self._daily_usage[service]
-        
-        # Clean up old entries
-        while daily_history and daily_history[0] < now - timedelta(hours=24):
-            daily_history.popleft()
-        
-        return (len(daily_history), self._daily_limits[service])
-
 
 # Global Instance
 rate_limiter = ServiceRateLimiter()
 
-
 def parse_retry_after(exception: Exception) -> float:
-    """
-    Extracts wait time from API error responses.
-    """
+    """Extracts wait time from API error responses."""
     try:
-        # 1. Check Retry-After header
+        # 1. Standard Retry-After header
         if hasattr(exception, 'response') and exception.response:
             headers = getattr(exception.response, 'headers', {})
             val = headers.get('Retry-After') or headers.get('retry-after')
             if val:
-                if val.isdigit(): 
-                    return float(val)
+                if val.isdigit(): return float(val)
                 return (parsedate_to_datetime(val) - datetime.now(timezone.utc)).total_seconds()
         
-        # 2. Check Google API metadata
-        if hasattr(exception, 'metadata') and isinstance(exception.metadata, dict):
-            if ms := exception.metadata.get('retry-after-ms'):
-                return float(ms) / 1000.0
-        
-        # 3. Parse Gemini error message
+        # 2. Extract from error string/message (covers most Gemini/Groq cases)
+        # Matches: "retry in 5s", "retryDelay: '5s'"
         error_str = str(exception)
-        retry_match = re.search(r'retry in ([\d.]+)s', error_str, re.IGNORECASE)
-        if retry_match:
-            return float(retry_match.group(1))
-        
-        # 4. Parse retryDelay from JSON
-        delay_match = re.search(r"'retryDelay':\s*'([\d.]+)s'", error_str)
-        if delay_match:
-            return float(delay_match.group(1))
-            
+        if match := re.search(r'(?:retry in|retryDelay\D+)([\d.]+)s?', error_str, re.IGNORECASE):
+            return float(match.group(1))
+
     except Exception:
         pass
     return 0.0
 
+def _is_hard_quota_error(error_msg: str) -> bool:
+    """Check if error indicates a hard billing quota that requires manual intervention."""
+    return any(k in error_msg for k in ['upgrade your plan', 'enable billing', 'billing must be enabled'])
 
 async def safe_api_call(
     func: Callable[..., Any],
@@ -179,77 +105,61 @@ async def safe_api_call(
     **kwargs
 ) -> Any:
     """
-    Unified API call wrapper with rate limiting, concurrency control, and retry logic.
-    
-    Follows SOLID: Single responsibility for all API calls, open for extension via semaphores.
+    Unified API call wrapper with rate limiting and retry logic.
     """
     max_retries = settings.RETRY_MAX_ATTEMPTS
-    base_delay = settings.RETRY_BASE_DELAY
-    max_delay = settings.RETRY_MAX_DELAY
     
-    retryable_exceptions = (ResourceExhausted, TooManyRequests, ServiceUnavailable, InternalServerError)
-    if GeminiClientError is not None:
-        retryable_exceptions = retryable_exceptions + (GeminiClientError,)
-    
-    # Acquire concurrency semaphore if service has one (SOLID: open/closed principle)
-    semaphore = rate_limiter._semaphores.get(service)
-    
-    async def _execute_with_rate_limit():
-        for attempt in range(max_retries):
-            try:
-                # Acquire rate limit slot
-                await rate_limiter.acquire_slot(service)
+    # Define retryable exceptions
+    retryable = (ResourceExhausted, TooManyRequests, ServiceUnavailable, InternalServerError)
+    if GEMINI_ERRORS_AVAILABLE:
+        retryable += (GeminiClientError,)
+
+    for attempt in range(max_retries + 1):
+        try:
+            await rate_limiter.acquire_slot(service)
+            return await func(*args, **kwargs)
+            
+        except retryable as e:
+            error_msg = str(e).lower()
+            
+            # Fail fast on hard quotas
+            if _is_hard_quota_error(error_msg):
+                logger.error(f"Hard quota exhausted for {service}: {str(e)[:200]}")
+                raise RuntimeError(ERR_BILLING_REQUIRED) from e
                 
-                # Execute the function
-                return await func(*args, **kwargs)
-                
-            except RuntimeError as e:
-                # Quota exhausted - fail immediately
-                if "quota exhausted" in str(e).lower():
-                    logger.error(f"Quota exhausted for {service}: {e}")
-                    raise
+            # Fail fast on quota exhausted (runtime) - enhanced detection
+            # Check for Gemini's actual error patterns:
+            # - "RESOURCE_EXHAUSTED" status
+            # - "exceeded your current quota" message
+            # - 429 status code
+            if any(pattern in error_msg for pattern in [
+                "resource_exhausted", 
+                "exceeded your current quota",
+                "quota exceeded",
+                "429"
+            ]):
+                logger.error(f"Quota exhausted for {service} - failing fast")
                 raise
-                
-            except retryable_exceptions as e:
-                # Check if this is a hard quota error
-                error_message = str(e).lower()
-                hard_quota_keywords = ['billing', 'upgrade', 'daily limit']
-                is_hard_quota = any(keyword in error_message for keyword in hard_quota_keywords)
-                
-                if is_hard_quota:
-                    logger.error(f"API quota exhausted for {service}: {str(e)[:200]}")
-                    raise RuntimeError(
-                        f"API quota exhausted for {service}. Check your billing/plan."
-                    ) from e
-                
-                # Last attempt - just raise
-                if attempt == max_retries - 1:
-                    logger.error(f"Max retries reached for {service}")
-                    raise
-                
-                # Calculate retry delay
-                retry_delay = parse_retry_after(e)
-                if retry_delay > 0:
-                    wait_time = min(retry_delay, max_delay)
-                    logger.warning(f"Rate limit for {service}. Retrying in {wait_time:.1f}s (attempt {attempt + 1}/{max_retries})")
-                else:
-                    # Exponential backoff
-                    wait_time = min(base_delay * (2 ** attempt), max_delay)
-                    logger.warning(f"Retrying {service} in {wait_time:.1f}s (attempt {attempt + 1}/{max_retries})")
-                
-                await asyncio.sleep(wait_time)
-                
-            except Exception as e:
-                # Non-retryable error
-                logger.error(f"Non-retryable error for {service}: {e}")
+            
+            # Stop if max retries reached
+            if attempt == max_retries:
+                logger.error(f"Max retries reached for {service}: {e}")
                 raise
-        
-        # Should never reach here
-        raise RuntimeError(f"Failed after {max_retries} attempts")
-    
-    # Execute with or without semaphore (DRY: single code path)
-    if semaphore:
-        async with semaphore:
-            return await _execute_with_rate_limit()
-    else:
-        return await _execute_with_rate_limit()
+
+            # Calculate delay
+            delay = parse_retry_after(e)
+            if delay == 0:
+                delay = min(settings.RETRY_BASE_DELAY * (2 ** attempt), settings.RETRY_MAX_DELAY)
+            
+            logger.warning(f"Retrying {service} in {delay:.1f}s (Attempt {attempt+1}) due to: {type(e).__name__}")
+            await asyncio.sleep(delay)
+            
+        except Exception as e:
+            # Handle Gemini 503 specifically (SDK often raises it wrapped)
+            if GEMINI_ERRORS_AVAILABLE and isinstance(e, ServerError):
+                 if "503" in str(e) and "overloaded" in str(e).lower():
+                     raise RuntimeError(ERR_MODEL_OVERLOADED) from e
+            
+            logger.error(f"Non-retryable error for {service}: {e}")
+            raise
+

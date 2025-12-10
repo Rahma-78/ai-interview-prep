@@ -40,7 +40,7 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 - ✅ **Multi-LLM Pipeline**
   - Groq (LLaMA 3.3 70B) for skill extraction
   - Google Gemini 2.5 Flash for source discovery with search grounding
-  - OpenRouter (GPT-OSS 120B) for question generation
+  - Groq (GPT-OSS 120B) for question generation
 
 - ✅ **Intelligent Context Handling**
   - **Context-Based**: Uses sourced technical content for deep, specific questions
@@ -51,12 +51,6 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
   - **Parallel Batch Processing**: Configurable concurrency for speed
   - **Recursive Batch Splitting**: Automatically splits batches when token limits are exceeded
   - **Token Optimization**: Minimizes API costs while maximizing context
-
-- ✅ **Production Features**
-  - **Service-Specific Rate Limiting**: Fine-grained control for Gemini, OpenRouter, and Groq
-  - **On-Demand Downloads**: Export results to TXT report whenever needed
-  - **Robust Error Handling**: Exponential backoff retries and fail-safe fallbacks
-  - **Comprehensive Logging**: Detailed info for debugging and monitoring
 
 - ✅ **Modern Web Stack**
   - FastAPI with async/await throughout
@@ -85,17 +79,21 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 | **🧠 Skill Analysis** | `LLMService.extract_skills` | Groq LLaMA 3.3 70B | Serial | Identify top 9 technical skills |
 | **📦 Batching** | `InterviewPipeline` | - | Serial | Group skills (3 per batch) |
 | **🔍 Source Discovery** | `BatchProcessor.discover_sources` | Gemini 2.5 Flash | **Parallel (3x)** | Find Google Search context |
-| **💭 Question Generation** | `BatchProcessor.generate_questions` | OpenRouter GPT-OSS | **Parallel (3x)** | Generate interview questions (Context/No-Context) |
+| **💭 Question Generation** | `BatchProcessor.generate_questions` | Groq GPT-OSS 120B | **Parallel (3x)** | Generate interview questions (Context/No-Context) |
 | **📊 Streaming** | `event_queue` | FastAPI | Real-time | Stream results via NDJSON |
 | **💾 Export** | `download_results` | Local FS | On-Demand | Download results as formatted TXT |
 
 ### Key Features
 
-- **⚡ Parallel Processing**: 3 batches processed simultaneously (source discovery + questions)
-- **Token-Aware Splitting**: Recursively halves batches if context size exceeds limits
-- **📊 Real-time Streaming**: Results appear as they're generated (NDJSON)
-- **🛡️ Error Handling**: Fallback strategies for token limits and API failures
-- **⏱️ Rate Limiting**: Service-specific limits (Gemini: 15 RPM, OpenRouter: 20 RPM, Groq: 30 RPM)
+- **⚡Parallel Processing**: 3 batches processed simultaneously (source discovery + questions)
+- **Token-Aware Splitting**: Iterative batch splitting when context exceeds safe limits (50K tokens)
+- **📊 Real-time Streaming**: Results appear as they're generated (NDJSON + WebSocket progress)
+- **🛡️ Error Handling**: 
+  - Fast-fail on quota exhaustion (no retries on 429 RESOURCE_EXHAUSTED)
+  - Unified retry logic for transient errors (503, 502, rate limits)
+  - Fallback to context-free generation when source discovery fails
+- **⏱️ Rate Limiting**: Service-specific limits (Gemini: 15 RPM)
+- **💾 On-Demand Downloads**: Export results to formatted TXT report
 
 ---
 
@@ -108,8 +106,7 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 
 ### LLM Providers
 - **LangChain** - LLM abstraction layer
-  - `langchain_groq` - Groq integration
-  - `langchain_openai` - OpenRouter integration
+  - `langchain_groq` - Groq integration (supports both LLaMA and GPT-OSS models)
   - `langchain_community` - Document loaders
 - **Google GenAI SDK** - Gemini with search grounding
 
@@ -121,9 +118,8 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 
 - Python 3.11+
 - API Keys for:
-  - [Groq](https://console.groq.com/) (Free tier available)
+  - [Groq](https://console.groq.com/) (Free tier available - provides both LLaMA 3.3 70B and GPT-OSS 120B)
   - [Google AI Studio](https://makersuite.google.com/app/apikey) (Gemini)
-  - [OpenRouter](https://openrouter.ai/) (GPT-OSS 120B)
 
 ### Setup
 
@@ -162,12 +158,10 @@ Create a `.env` file in the project root:
 # LLM Provider API Keys
 GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
-OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Rate Limits (Requests Per Minute)
-GEMINI_RPM=15
-OPENROUTER_RPM=20
-GROQ_RPM=30
+GEMINI_RPM=15   # Conservative limit for free tier
+
 
 # Pipeline Configuration
 SKILL_COUNT=9        # Number of skills to extract
@@ -344,7 +338,7 @@ ai-interview-prep/
 
 The codebase follows:
 - **SOLID Principles** - Clean architecture with separation of concerns
-- **DRY** - Unified context building and token checking
+- **DRY** - Consolidated retry logic, unified error handling, single-pass parsing
 - **Type Hints** - Full Pydantic validation and Python type annotations
 - **Async/Await** - Non-blocking I/O throughout
 

@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Optional, Type
 import logging
 import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ def clean_llm_json_output(raw_text: str) -> str:
         return ""
     
     # Remove markdown code blocks
-    import re
     text = re.sub(r'```json\s*', '', raw_text)
     text = re.sub(r'```', '', text)
     
