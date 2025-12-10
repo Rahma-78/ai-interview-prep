@@ -26,10 +26,13 @@ class BatchProcessor:
     Processes skill batches through the source discovery and question generation pipeline.
     
     Responsibilities:
-    - Manage concurrent batch processing with semaphore
+    - Process batches in parallel (rate limiting handled by safe_api_call)
     - Handle token limits and fallback to per-skill processing
     - Put results into event queue for streaming
     """
+    
+    # Removed: Global lock replaced with intelligent rate limiting via safe_api_call
+    # Concurrency now controlled by semaphore in rate_limiter.py (max 3 concurrent)
     
     def __init__(self, event_queue: asyncio.Queue, max_concurrent: int = None):
         """
@@ -40,9 +43,6 @@ class BatchProcessor:
             max_concurrent: Maximum concurrent batch pipelines (defaults to settings.MAX_CONCURRENT_BATCHES)
         """
         self.event_queue = event_queue
-        if max_concurrent is None:
-            max_concurrent = settings.MAX_CONCURRENT_BATCHES
-        self.semaphore = asyncio.Semaphore(max_concurrent)
         self.logger = logger
         self._first_source_discovery = True
         self._first_question_generation = True
@@ -51,7 +51,9 @@ class BatchProcessor:
         """
         Pipeline for a single batch:
         1. Discover Sources
-        2. Generate Questions (Immediately)
+        2. Generate Questions
+        
+        Batches run in true parallel with no artificial rate limiting.
         
         Args:
             batch_index: Current batch number (1-indexed)
@@ -59,146 +61,127 @@ class BatchProcessor:
             total_batches: Total number of batches for logging
         """
         batch_label = f"Batch {batch_index}/{total_batches}"
-        batch_outcome = "failure"  # Track outcome: 'success', 'partial', or 'failure'
         skills_processed = 0
         
-        async with self.semaphore:
-            try:
-                # --- Step 1: Source Discovery ---
-                # Send step_2 transition for the first batch
-                if self._first_source_discovery:
-                    self._first_source_discovery = False
-                    await self.event_queue.put({"type": "status", "content": "step_2"})
-                
-                self.logger.info(f"[{batch_label}] Starting source discovery")
-                await self.event_queue.put({"type": "status", "content": f"Finding sources for {batch_label}..."})
-                
-                source_results_list = await discover_sources(batch_skills)
-                sources = AllSkillSources(all_sources=source_results_list)
-                
-                self.logger.info(f"[{batch_label}] Source discovery completed ({len(sources.all_sources)} sources)")
-                
-                # Check if any skills are missing sources
-                skills_with_missing_sources = []
-                for skill in batch_skills:
-                    has_source = False
-                    for source_item in sources.all_sources:
-                        if source_item.skill == skill and source_item.extracted_content and source_item.extracted_content.strip():
-                            has_source = True
-                            break
-                    if not has_source:
-                        skills_with_missing_sources.append(skill)
-                
-                # --- Step 2: Question Generation ---
-                # Send step_3 transition for the first batch
-                if self._first_question_generation:
-                    self._first_question_generation = False
-                    await self.event_queue.put({"type": "status", "content": "step_3"})
-                
-                self.logger.info(f"[{batch_label}] Starting question generation (Pipeline transition)")
-                await self.event_queue.put({"type": "status", "content": f"Generating questions for {batch_label}..."})
+        try:
+            # --- Step 1: Source Discovery ---
+            # Send step_2 transition for the first batch
+            if self._first_source_discovery:
+                self._first_source_discovery = False
+                await self.event_queue.put({"type": "status", "content": "step_2"})
+            
+            self.logger.info(f"[{batch_label}] Starting source discovery")
+            await self.event_queue.put({"type": "status", "content": f"Finding sources for {batch_label}..."})
+            
+            source_results_list = await discover_sources(batch_skills)
+            sources = AllSkillSources(all_sources=source_results_list)
+            
+            self.logger.info(f"[{batch_label}] Source discovery completed ({len(sources.all_sources)} sources)")
+            
+            # Check if any skills are missing sources
+            skills_with_missing_sources = []
+            for skill in batch_skills:
+                has_source = False
+                for source_item in sources.all_sources:
+                    if source_item.skill == skill and source_item.extracted_content and source_item.extracted_content.strip():
+                        has_source = True
+                        break
+                if not has_source:
+                    skills_with_missing_sources.append(skill)
+            
+            # --- Step 2: Question Generation ---
+            # Send step_3 transition for the first batch
+            if self._first_question_generation:
+                self._first_question_generation = False
+                await self.event_queue.put({"type": "status", "content": "step_3"})
+            
+            self.logger.info(f"[{batch_label}] Starting question generation (Pipeline transition)")
+            await self.event_queue.put({"type": "status", "content": f"Generating questions for {batch_label}..."})
 
-                # Only split if some skills are missing sources
+            # Only split if some skills are missing sources
+            if skills_with_missing_sources:
+                self.logger.info(f"[{batch_label}] Detected {len(skills_with_missing_sources)} skills without sources - splitting batch")
+                
+                # Split skills into those with sources and those without
+                skills_with_sources = [s for s in batch_skills if s not in skills_with_missing_sources]
+                
+                # Log the split
+                self.logger.info(f"[{batch_label}] {len(skills_with_missing_sources)} skills without sources will use context-free prompts: {skills_with_missing_sources}")
+                if skills_with_sources:
+                    self.logger.info(f"[{batch_label}] {len(skills_with_sources)} skills with sources will use context-based prompts: {skills_with_sources}")
+                
+                # Process skills with sources as a batch (if any) - delegate to recursive processor
+                count_with_sources = 0
+                if skills_with_sources:
+                    count_with_sources = await self._process_recursive_batch(skills_with_sources, sources, batch_label)
+                
+                # Process skills without sources in parallel with context-free prompt
+                contextfree_results = []
                 if skills_with_missing_sources:
-                    self.logger.info(f"[{batch_label}] Detected {len(skills_with_missing_sources)} skills without sources - splitting batch")
-                    
-                    # Split skills into those with sources and those without
-                    skills_with_sources = [s for s in batch_skills if s not in skills_with_missing_sources]
-                    
-                    # Log the split
-                    self.logger.info(f"[{batch_label}] {len(skills_with_missing_sources)} skills without sources will use context-free prompts: {skills_with_missing_sources}")
-                    if skills_with_sources:
-                        self.logger.info(f"[{batch_label}] {len(skills_with_sources)} skills with sources will use context-based prompts: {skills_with_sources}")
-                    
-                    # Process skills with sources as a batch (if any) - delegate to recursive processor
-                    count_with_sources = 0
-                    if skills_with_sources:
-                        count_with_sources = await self._process_recursive_batch(skills_with_sources, sources, batch_label)
-                    
-                    # Process skills without sources in parallel with context-free prompt
-                    contextfree_results = []
-                    if skills_with_missing_sources:
-                        contextfree_results = await asyncio.gather(*[
-                            self._process_contextfree_skill(skill, batch_label)
-                            for skill in skills_with_missing_sources
-                        ])
-                    
-                    # Count successful context-free skills
-                    count_contextfree = sum(1 for success in contextfree_results if success)
-                    skills_processed = count_with_sources + count_contextfree
-                else:
-                    # All skills have sources - delegate to recursive processor
-                    skills_processed = await self._process_recursive_batch(batch_skills, sources, batch_label)
+                    contextfree_results = await asyncio.gather(*[
+                        self._process_contextfree_skill(skill, batch_label)
+                        for skill in skills_with_missing_sources
+                    ])
                 
-                # Determine batch outcome
-                if skills_processed == len(batch_skills):
-                    batch_outcome = "success"
-                elif skills_processed > 0:
-                    batch_outcome = "partial"
-                else:
-                    batch_outcome = "failure"
+                # Count successful context-free skills
+                count_contextfree = sum(1 for success in contextfree_results if success)
+                skills_processed = count_with_sources + count_contextfree
+            else:
+                # All skills have sources - delegate to recursive processor
+                skills_processed = await self._process_recursive_batch(batch_skills, sources, batch_label)
 
-            except Exception as e:
-                # Optimized Logging: Don't dump stack traces for known operational errors
-                error_text = str(e).lower()
-                is_quota_error = any(k in error_text for k in ["quota exhausted", "daily limit", "resource_exhausted"]) or \
-                                 any(k in str(e.__cause__).lower() for k in ["quota exhausted", "daily limit", "resource_exhausted"] if e.__cause__)
-                
-                if is_quota_error:
-                    self.logger.warning(f"[{batch_label}] Quota exhaustion detected ({str(e)[:100]}...)")
-                elif "source discovery failed" in error_text:
-                     # This is a known operational error from source_discovery
-                    self.logger.error(f"[{batch_label}] Pipeline error: {e}")
-                else:
-                    # Unexpected crash - log full traceback
-                    self.logger.error(f"[{batch_label}] Unexpected Pipeline Error: {e}", exc_info=True)
+        except Exception as e:
+            # Optimized Logging: Don't dump stack traces for known operational errors
+            error_text = str(e).lower()
+            is_quota_error = any(k in error_text for k in ["quota exhausted", "daily limit", "resource_exhausted"]) or \
+                             any(k in str(e.__cause__).lower() for k in ["quota exhausted", "daily limit", "resource_exhausted"] if e.__cause__)
+            
+            if is_quota_error:
+                self.logger.warning(f"[{batch_label}] Quota exhaustion detected ({str(e)[:100]}...)")
+            elif "source discovery failed" in error_text:
+                 # This is a known operational error from source_discovery
+                self.logger.error(f"[{batch_label}] Pipeline error: {e}")
+            else:
+                # Unexpected crash - log full traceback
+                self.logger.error(f"[{batch_label}] Unexpected Pipeline Error: {e}", exc_info=True)
 
-                batch_outcome = "failure"
-                skills_processed = 0
-                
-                if is_quota_error:
-                    # Emit distinct quota_error event for clear UI messaging
-                    self.logger.warning(f"[{batch_label}] Quota exhaustion detected - notifying UI")
-                    await self.event_queue.put({
-                        "type": "quota_error",
-                        "content": {
-                            "error": str(e),
-                            "error_type": "QuotaExhausted",
-                            "user_message": (
-                                "The LLM provider has reached its API request limit. "
-                                "This is not a system error. Please try again later or contact support."
-                            ),
-                            "batch_index": batch_index
-                        }
-                    })
-                else:
-                    # Generic error handling
-                    await self.event_queue.put({
-                        "type": "error",
-                        "content": {
-                            "error": f"Batch {batch_index} failed: {e}",
-                            "error_type": type(e).__name__
-                        }
-                    })
-            finally:
-                # Send distinct completion event based on outcome
-                event_type = f"batch_{batch_outcome}"
-                completion_msg = {
-                    "success": f"✅ {batch_label} SUCCESS: {skills_processed}/{len(batch_skills)} skills",
-                    "partial": f"⚠️  {batch_label} PARTIAL: {skills_processed}/{len(batch_skills)} skills",
-                    "failure": f"❌ {batch_label} FAILED: 0/{len(batch_skills)} skills"
-                }
-                
-                self.logger.info(completion_msg[batch_outcome])
+            skills_processed = 0
+            
+            if is_quota_error:
+                # Emit distinct quota_error event for clear UI messaging
+                self.logger.warning(f"[{batch_label}] Quota exhaustion detected - notifying UI")
                 await self.event_queue.put({
-                    "type": event_type,
+                    "type": "quota_error",
                     "content": {
-                        "batch_index": batch_index,
-                        "total_skills": len(batch_skills),
-                        "processed_skills": skills_processed,
-                        "outcome": batch_outcome
+                        "error": str(e),
+                        "error_type": "QuotaExhausted",
+                        "user_message": (
+                            "The LLM provider has reached its API request limit. "
+                            "This is not a system error. Please try again later or contact support."
+                        ),
+                        "batch_index": batch_index
                     }
                 })
+            else:
+                # Generic error handling
+                await self.event_queue.put({
+                    "type": "error",
+                    "content": {
+                        "error": f"Batch {batch_index} failed: {e}",
+                        "error_type": type(e).__name__
+                    }
+                })
+        finally:
+            # Send single batch completion event
+            self.logger.info(f"[{batch_label}] Completed: {skills_processed}/{len(batch_skills)} skills processed")
+            await self.event_queue.put({
+                "type": "batch_completed",
+                "content": {
+                    "batch_index": batch_index,
+                    "total_skills": len(batch_skills),
+                    "processed_skills": skills_processed
+                }
+            })
     
     async def _process_recursive_batch(self, skills: List[str], sources: AllSkillSources, batch_label: str) -> int:
         """
@@ -389,6 +372,9 @@ class BatchProcessor:
 
             self.logger.info(f"[{batch_label}] Processing '{skill}' individually (~{token_est} tokens)")
             
+            # Rate limiting handled by LLMService.generate_questions via safe_api_call
+            self.logger.info(f"[{batch_label}] Processing question generation for '{skill}'")
+            
             prompt = generate_questions_prompt(skill, skill_context)
             questions_obj = await LLMService.generate_questions(
                 prompt, 
@@ -422,6 +408,9 @@ class BatchProcessor:
         try:
             self.logger.info(f"[{batch_label}] Processing '{skill}' with context-free prompt (no sources)")
             
+            # Rate limiting handled by LLMService.generate_questions via safe_api_call
+            self.logger.info(f"[{batch_label}] Processing context-free question generation for '{skill}'")
+            
             # Use context-free prompt directly
             prompt = generate_contextfree_questions_prompt(skill)
             questions_obj = await LLMService.generate_questions(
@@ -448,10 +437,14 @@ class BatchProcessor:
     async def _process_batch_questions(self, batch_skills: List[str], context_str: str, batch_label: str) -> int:
         """
         Process questions for entire batch.
+        Serialized with lock to prevent OpenRouter rate limiting.
         
         Returns:
             Number of skills successfully processed
         """
+        # Rate limiting handled by LLMService.generate_questions via safe_api_call
+        self.logger.info(f"[{batch_label}] Processing batch question generation")
+        
         prompt = generate_questions_prompt(batch_skills, context_str)
         questions_obj = await LLMService.generate_questions(
             prompt, 

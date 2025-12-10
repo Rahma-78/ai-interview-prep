@@ -1,6 +1,7 @@
 <!-- force refresh -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +9,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ cache_version }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -28,7 +30,8 @@
                     <span class="file-msg">Drag & Drop your Resume (PDF) here</span>
                     <span class="file-or">or</span>
                     <input class="file-input" type="file" id="resume-file" accept=".pdf" hidden>
-                    <button class="btn-primary" onclick="document.getElementById('resume-file').click()">Browse Files</button>
+                    <button class="btn-primary" onclick="document.getElementById('resume-file').click()">Browse
+                        Files</button>
                 </div>
                 <div id="file-info" class="file-info hidden">
                     <i class="fa-solid fa-file-pdf"></i>
@@ -63,6 +66,7 @@
         </footer>
     </div>
 
-    <script src="/static/js/app.js?v=2"></script>
+    <script src="/static/js/app.js?v={{ cache_version }}"></script>
 </body>
+
 </html>

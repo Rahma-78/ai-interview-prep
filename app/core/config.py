@@ -32,25 +32,17 @@ class Settings(BaseSettings):
     
     # Service Specific Limits (Requests Per Minute)
     GEMINI_RPM: int = 15
-    OPENROUTER_RPM: int = 20
-    GROQ_RPM: int = 30
+    GROQ_RPM: int = 60
+    OPENROUTER_RPM: int = 20  # Conservative limit for OpenRouter API
     
     # Service Specific Daily Limits
-    GEMINI_DAILY_LIMIT: int = 1500
-    OPENROUTER_DAILY_LIMIT: int = 1000  
+    GEMINI_DAILY_LIMIT: int = 20
     GROQ_DAILY_LIMIT: int = 1000  
-    
     
     # Retry Configuration
     RETRY_MAX_ATTEMPTS: int = 3
     RETRY_BASE_DELAY: float = 1.0
     RETRY_MAX_DELAY: float = 60.0
-    RETRY_MIN_QUOTA_DELAY: float = 30.0
-    
-    # Fail-Fast Configuration (for user-facing or latency-sensitive operations)
-    RETRY_FAIL_FAST_MAX_RETRIES: int = 1
-    RETRY_FAIL_FAST_MAX_DELAY: float = 5.0
-    RETRY_FAIL_FAST_MIN_QUOTA_DELAY: float = 3.0
    
     # Pipeline Configuration
     SKILL_COUNT: int = 9
@@ -59,10 +51,19 @@ class Settings(BaseSettings):
     # Concurrency Configuration
     MAX_CONCURRENT_BATCHES: int = 3
     SOURCE_DISCOVERY_CONCURRENCY: int = 3
-    MIN_SOURCES_PER_SKILL: int = 3  # Minimum required sources per skill for quality
+    MAX_SOURCES_PER_SKILL: int = 3  # Maximum sources per skill for quality
+    MAX_CONCURRENT_QUESTION_GEN: int = 3  # Allow 3 concurrent question generation (matches batch count)
+    
+    # Performance Optimization
+    GEMINI_BATCH_STAGGER_DELAY: float = 0.5  # Delay between concurrent Gemini batch starts (seconds)
+    GEMINI_REQUEST_TIMEOUT: int = 30  # Gemini API request timeout (seconds)
     
     # Timeout Configuration (seconds)
     GLOBAL_TIMEOUT_SECONDS: int = 600  # 10 minutes
+    
+    # Streaming Configuration
+    ENABLE_STREAMING: bool = True  # Use async streaming for LLM calls (eliminates timeouts)
+    STREAM_CHUNK_TIMEOUT: int = 30  # Timeout per chunk (not total duration)
     
     # Token Management
     SAFE_TOKEN_LIMIT: int = 50000  # Safe input threshold for OpenRouter gpt-oss-120b

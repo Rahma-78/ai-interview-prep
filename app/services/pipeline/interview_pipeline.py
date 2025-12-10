@@ -41,25 +41,20 @@ class InterviewPipeline:
     Architecture: Logic-driven (Direct LLM calls), not Agent-driven.
     """
 
-    def __init__(self, file_path: str, validate: bool = True, correlation_id: str = None):
+    def __init__(self, file_path: str, correlation_id: str = None):
         """
         Initialize the InterviewPipeline.
 
         Args:
-            file_path: Path to the resume file
-            validate: Whether to validate the file immediately
+            file_path: Path to the resume file (already validated by API layer)
             correlation_id: Optional correlation ID for request tracking (auto-generated if not provided)
         """
         self.file_path = file_path
         self.logger = logger
-        self.file_validator = FileValidator(logger=self.logger)
         
         # Set correlation ID for tracking
         self.correlation_id = correlation_id or str(uuid.uuid4())
         set_correlation_id(self.correlation_id)
-
-        if validate:
-            self.file_validator.validate(self.file_path)
             
         self.logger.info(f"InterviewPipeline initialized in Direct LLM mode (correlation_id={self.correlation_id})")
 
@@ -106,6 +101,7 @@ class InterviewPipeline:
             yield {"type": "status", "content": "step_1"}
             self.logger.info("Starting skill extraction...")
 
+            # Extract text from PDF (synchronous - fast enough, no need for async wrapper)
             resume_text = file_text_extractor(self.file_path)
             if not resume_text or resume_text.startswith("Error"):
                 self.logger.error(f"Failed to extract text: {resume_text}")
@@ -139,46 +135,27 @@ class InterviewPipeline:
             event_queue = asyncio.Queue()
             batch_processor = BatchProcessor(event_queue)
 
-            # Start all pipelines concurrently
+            # Start all pipelines concurrently with staggering to reduce Gemini API contention
             self.logger.info("Starting concurrent batch pipelines...")
             for i, batch in enumerate(skill_batches):
+                # Stagger batch starts to prevent simultaneous Gemini API hits (performance optimization)
+                if i > 0:
+                    await asyncio.sleep(settings.GEMINI_BATCH_STAGGER_DELAY)
                 asyncio.create_task(batch_processor.process_batch(i + 1, batch, total_batches))
 
-            # Consumer loop - yield events as they come
+            # Consumer loop - stream events as they come
             completed_batches = 0
-            successful_batches = 0
-            partial_batches = 0
-            failed_batches = 0
-            all_results = []
-            quota_error_detected = False
             
             while completed_batches < total_batches:
                 event = await event_queue.get()
                 
-                # Handle distinct completion events
-                if event["type"] == "batch_success":
-                    successful_batches += 1
+                # Handle batch completion event
+                if event["type"] == "batch_completed":
                     completed_batches += 1
-                elif event["type"] == "batch_partial":
-                    partial_batches += 1
-                    completed_batches += 1
-                elif event["type"] == "batch_failure":
-                    failed_batches += 1
-                    completed_batches += 1
+                    self.logger.info(f"Progress: {completed_batches}/{total_batches} batches completed")
                 else:
-                    if event["type"] == "data":
-                        all_results.append(event["content"])
-                    elif event["type"] == "quota_error":
-                        quota_error_detected = True
-                        self.logger.warning("Quota error event received - forwarding to UI")
-                    # Yield all non-completion events to frontend
+                    # Stream all other events to frontend immediately
                     yield event
-            
-            # Log final progress with outcome breakdown
-            self.logger.info(
-                f"Progress: {completed_batches}/{total_batches} batches "
-                f"({successful_batches} success, {partial_batches} partial, {failed_batches} failure)"
-            )
 
             self.logger.info("All batches completed.")
 
@@ -188,13 +165,12 @@ class InterviewPipeline:
             # ---------------------------------------------------------
             # Note: Results are no longer auto-saved to disk.
             # Users can download via the UI download button which calls /download-results endpoint.
-            self.logger.info(f"Pipeline complete. Generated {len(all_results)} skill result sets.")
+            self.logger.info("Pipeline complete.")
             
-            # Yield completion event with download readiness
+            # Yield completion event
             yield {
                 "type": "complete",
                 "content": {
-                    "total_results": len(all_results),
                     "message": "All questions generated successfully. Click Download to save results."
                 }
             }

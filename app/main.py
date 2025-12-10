@@ -3,10 +3,12 @@ import os
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
 import logging
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, Response, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from app.api.v1.interview import interview_router
@@ -47,17 +49,19 @@ static_dir = Path("app/static")
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory="app/templates")
+
 # Include routers
 app.include_router(interview_router, prefix="/api/v1", tags=["interview"])
 
 @app.get("/")
-async def read_root():
-    import time
-    with open('app/templates/index.html', 'r', encoding='utf-8') as f:
-        content = f.read()
-    # Dynamic cache busting: replace the static version with current timestamp
-    content = content.replace('app.js?v=2', f'app.js?v={int(time.time())}')
-    return HTMLResponse(content)
+async def read_root(request: Request):
+    """Render the main page with dynamic cache busting for static assets."""
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "cache_version": int(time.time())
+    })
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():

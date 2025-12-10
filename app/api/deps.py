@@ -10,7 +10,7 @@ def get_crew_factory() -> Callable[[str], InterviewPipeline]:
     This allows deferring creation until the file path is known.
     """
     def factory(file_path: str, correlation_id: str = None) -> InterviewPipeline:
-        return InterviewPipeline(file_path=file_path, validate=False, correlation_id=correlation_id)
+        return InterviewPipeline(file_path=file_path, correlation_id=correlation_id)
     return factory
 
 

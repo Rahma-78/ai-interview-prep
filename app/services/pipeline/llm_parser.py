@@ -1,50 +1,67 @@
-from app.services.tools.helpers import clean_llm_json_output
-import logging
 from typing import Any
+import logging
+import json
 
 logger = logging.getLogger(__name__)
 
-def parse_llm_response(
-        result: Any,
-        schema_class: type,
-        fallback_data: Any = None
-    ) -> Any:
-        """
-        Generic parser for CrewAI results following DRY and Single Responsibility principles.
 
-        Args:
-            result: The CrewAI result object
-            schema_class: Pydantic model class to validate against
-            fallback_data: Data to return on failure (optional)
-
-        Returns:
-            Validated Pydantic model instance
-
-        Raises:
-            ValueError: If parsing fails and no fallback_data provided
-        """
+def clean_llm_json_output(raw_text: str) -> str:
+    """Cleans LLM output to extract valid JSON."""
+    if not raw_text:
+        return ""
+    
+    # Remove markdown code blocks
+    import re
+    text = re.sub(r'```json\s*', '', raw_text)
+    text = re.sub(r'```', '', text)
+    
+    # Try standard JSON parsing
+    try:
+        decoded_object = json.loads(text)
+        return json.dumps(decoded_object)
+    except json.JSONDecodeError:
+        pass
+    
+    # Fallback: extract JSON from text
+    start_idx = text.find('{')
+    end_idx = text.rfind('}')
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         try:
-            # Direct LLM calls return string responses
-            # Handle both string inputs and legacy CrewAI objects for compatibility
-            if isinstance(result, str):
-                raw_content = result
-            elif hasattr(result, 'raw'):
-                raw_content = result.raw
-            else:
-                raw_content = str(result)
+            extracted = text[start_idx:end_idx+1]
+            json.loads(extracted)  # Validate
+            return extracted
+        except json.JSONDecodeError:
+            pass
+    
+    return text.strip()
 
-            cleaned_json = clean_llm_json_output(raw_content)
-            import json
-            data = json.loads(cleaned_json)
-            return schema_class(**data)  # Two-step parsing with coercion
 
-        except Exception as e:
-            logger.error(
-                f"Error parsing {schema_class.__name__}: {e}",
-                exc_info=True
-            )
-            logger.error(f"Raw output (first 500 chars): {str(result)[:500]}...")
+def parse_llm_response(
+    result: Any,
+    schema_class: type,
+    fallback_data: Any = None
+) -> Any:
+    """
+    Parse LLM response and validate against schema.
+    """
+    try:
+        # Handle string responses from direct LLM calls
+        if isinstance(result, str):
+            raw_content = result
+        else:
+            raw_content = str(result)
 
-            if fallback_data is not None:
-                return fallback_data
-            raise ValueError(f"Failed to parse {schema_class.__name__}: {e}")
+        cleaned_json = clean_llm_json_output(raw_content)
+        data = json.loads(cleaned_json)
+        return schema_class(**data)
+
+    except Exception as e:
+        logger.error(
+            f"Error parsing {schema_class.__name__}: {e}",
+            exc_info=True
+        )
+        logger.error(f"Raw output (first 500 chars): {str(result)[:500]}...")
+
+        if fallback_data is not None:
+            return fallback_data
+        raise ValueError(f"Failed to parse {schema_class.__name__}: {e}")

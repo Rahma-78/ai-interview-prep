@@ -23,7 +23,7 @@ def generate_questions_prompt(skills: Union[str, List[str]], context_str: str) -
         return (
             f"Generate insightful, technical interview questions for {skills_text}.\n"
             f"Use the provided technical context:\n{context_str}\n\n"
-            "Focus on conceptual understanding, trade-offs, and real-world applications.\n"
+            "Focus on conceptual understanding, Analysis and comparison , and real-world applications.\n"
             "Questions should reveal deep technical knowledge.\n\n"
             "Return ONLY a JSON object with this structure:\n"
             "{\"all_questions\": [{\"skill\": \"...\", \"questions\": [\"question1\", \"question2\", ...]}]}"

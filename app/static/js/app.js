@@ -1,93 +1,104 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const dropArea = document.getElementById('drop-area');
-    const fileInput = document.getElementById('resume-file');
-    const fileInfo = document.getElementById('file-info');
-    const filenameDisplay = document.getElementById('filename');
-    const removeFileBtn = document.getElementById('remove-file');
-    const analyzeBtn = document.getElementById('analyze-btn');
-    const loadingSection = document.getElementById('loading-section');
-    const resultsSection = document.getElementById('results-section');
-    const questionsContainer = document.getElementById('questions-container');
-    const loadingText = document.getElementById('loading-text');
+    // --- 1. Centralized DOM Elements (Optimization) ---
+    const elements = {
+        dropArea: document.getElementById('drop-area'),
+        fileInput: document.getElementById('resume-file'),
+        fileInfo: document.getElementById('file-info'),
+        filenameDisplay: document.getElementById('filename'),
+        removeFileBtn: document.getElementById('remove-file'),
+        analyzeBtn: document.getElementById('analyze-btn'),
+        loadingSection: document.getElementById('loading-section'),
+        resultsSection: document.getElementById('results-section'),
+        questionsContainer: document.getElementById('questions-container'),
+        loadingText: document.getElementById('loading-text'),
+        steps: document.querySelectorAll('.step')
+    };
+
+    const stepTexts = [
+        "Extracting Skills from Resume...",
+        "Discovering Technical Sources...",
+        "Generating Interview Questions..."
+    ];
 
     let currentFile = null;
-    let allResults = []; // Store all results for download
+    let allResults = [];
+    let totalBatches = 0;
+    let completedBatches = 0;
 
-    // Generate a random client ID
+    // Generate Client ID
     const clientId = 'client_' + Math.random().toString(36).substr(2, 9);
 
-    // Connect to WebSocket
+    // --- 2. Simplified WebSocket Handling (Refactor) ---
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/${clientId}`;
     const ws = new WebSocket(wsUrl);
 
-    // Track progress state
-    let totalBatches = 0;
-    let completedBatches = 0;
-
-    const messageHandlers = {
-        'step_1': () => updateProgress(1),
-        'step_2': () => updateProgress(2),
-        'step_2_complete': () => {
-            document.querySelectorAll('.step')[1].classList.add('completed');
-            document.querySelectorAll('.step')[1].classList.remove('active');
-        },
-        'step_3': () => {
-            updateProgress(3);
-            completedBatches = 0;
-        }
-    };
-
     ws.onmessage = (event) => {
         const message = event.data;
 
-        if (messageHandlers[message]) {
-            messageHandlers[message]();
-        } else {
-            // Handle granular status updates
-            if (loadingText) {
-                // Extract batch info if present
-                const batchMatch = message.match(/Batch (\d+)\/(\d+)/);
-                if (batchMatch) {
-                    const currentBatch = parseInt(batchMatch[1]);
-                    totalBatches = parseInt(batchMatch[2]);
-
-                    if (message.includes('Completed') || message.includes('Generated questions')) {
-                        completedBatches = Math.min(completedBatches + 1, totalBatches);
-                        const progress = Math.round((completedBatches / totalBatches) * 100);
-                        updateProgressPercentage(progress);
-                    }
-                }
-
-                loadingText.textContent = message;
-                loadingText.classList.remove('pulse');
-                void loadingText.offsetWidth; // trigger reflow
-                loadingText.classList.add('pulse');
+        if (message.startsWith('step_')) {
+            const step = parseInt(message.replace('step_', '').replace('_complete', ''));
+            // Check if it's a valid number, otherwise it might be a status
+            if (!isNaN(step)) {
+                handleStepMessage(step, message.includes('_complete'));
             }
+        } else if (elements.loadingText) {
+            handleStatusMessage(message);
         }
     };
+
+    function handleStepMessage(step, isComplete) {
+        updateProgress(step);
+
+        if (isComplete && step === 2) {
+            elements.steps[1].classList.add('completed');
+            elements.steps[1].classList.remove('active');
+            completedBatches = 0; // Reset for step 3
+        }
+    }
+
+    function handleStatusMessage(message) {
+        // Extract batch info
+        const batchMatch = message.match(/Batch (\d+)\/(\d+)/);
+        if (batchMatch) {
+            // totalBatches = parseInt(batchMatch[2]); // Update total if needed
+            totalBatches = parseInt(batchMatch[2]);
+
+            if (message.includes('Completed') || message.includes('Generated questions')) {
+                updateBatchProgress();
+            }
+        }
+
+        elements.loadingText.textContent = message;
+        elements.loadingText.classList.remove('pulse');
+        void elements.loadingText.offsetWidth; // trigger reflow
+        elements.loadingText.classList.add('pulse');
+    }
+
+    function updateBatchProgress() {
+        completedBatches = Math.min(completedBatches + 1, totalBatches);
+        const progress = totalBatches > 0 ? Math.round((completedBatches / totalBatches) * 100) : 0;
+        updateProgressPercentage(progress);
+    }
 
     // --- Event Listeners ---
 
     // Drag & Drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, e => {
+        elements.dropArea.addEventListener(eventName, e => {
             e.preventDefault();
             e.stopPropagation();
         }, false);
     });
 
-    ['dragenter', 'dragover'].forEach(() => dropArea.classList.add('dragover'));
-    ['dragleave', 'drop'].forEach(() => dropArea.classList.remove('dragover'));
+    ['dragenter', 'dragover'].forEach(() => elements.dropArea.classList.add('dragover'));
+    ['dragleave', 'drop'].forEach(() => elements.dropArea.classList.remove('dragover'));
 
-    dropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files), false);
-    fileInput.addEventListener('change', e => handleFiles(e.target.files));
+    elements.dropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files), false);
+    elements.fileInput.addEventListener('change', e => handleFiles(e.target.files));
 
-    // File Management
-    removeFileBtn.addEventListener('click', resetFileSelection);
-
-    // Analysis
-    analyzeBtn.addEventListener('click', startAnalysis);
+    elements.removeFileBtn.addEventListener('click', resetFileSelection);
+    elements.analyzeBtn.addEventListener('click', startAnalysis);
 
     // --- Core Functions ---
 
@@ -101,30 +112,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         currentFile = file;
-        filenameDisplay.textContent = file.name;
+        elements.filenameDisplay.textContent = file.name;
         toggleView('file-selected');
     }
 
     function resetFileSelection() {
         currentFile = null;
-        fileInput.value = '';
+        elements.fileInput.value = '';
         toggleView('initial');
     }
 
+    // --- 3. Efficient View & Progress Toggling (Refactor) ---
     function toggleView(state) {
-        const isSelected = state === 'file-selected';
-        const isAnalyzing = state === 'analyzing';
-        const isComplete = state === 'complete';
+        const viewStates = {
+            'initial': { dropArea: false, fileInfo: false, analyzeBtn: false, loadingSection: true, resultsSection: true },
+            'file-selected': { dropArea: true, fileInfo: false, analyzeBtn: false, loadingSection: true, resultsSection: true },
+            'analyzing': { dropArea: true, fileInfo: true, analyzeBtn: true, loadingSection: false, resultsSection: true },
+            'complete': { dropArea: true, fileInfo: true, analyzeBtn: false, loadingSection: true, resultsSection: false }
+        };
 
-        // Elements visibility toggling
-        dropArea.classList.toggle('hidden', isSelected || isAnalyzing || isComplete);
-        fileInfo.classList.toggle('hidden', !isSelected && !isAnalyzing && !isComplete);
-        analyzeBtn.classList.toggle('hidden', !isSelected && !isComplete);
-        loadingSection.classList.toggle('hidden', !isAnalyzing);
-        resultsSection.classList.toggle('hidden', !isComplete && !resultsSection.classList.contains('hidden')); // Keep visible if we appended results
+        const visibility = viewStates[state] || viewStates['initial'];
 
+        Object.entries(visibility).forEach(([elementKey, isHidden]) => {
+            if (elements[elementKey]) {
+                elements[elementKey].classList.toggle('hidden', isHidden);
+            }
+        });
+
+        // Special case: Ensure results hidden on initial
         if (state === 'initial') {
-            resultsSection.classList.add('hidden');
+            elements.resultsSection.classList.add('hidden');
+        }
+    }
+
+    function updateProgress(step) {
+        elements.steps.forEach((el, index) => {
+            const isCompleted = index + 1 < step;
+            const isActive = index + 1 === step;
+
+            el.classList.toggle('completed', isCompleted);
+            el.classList.toggle('active', isActive);
+            if (!isCompleted && !isActive) {
+                el.classList.remove('completed', 'active');
+            }
+        });
+
+        if (step > 0) {
+            elements.loadingText.textContent = stepTexts[step - 1];
+        } else {
+            elements.loadingText.textContent = "Starting analysis...";
+        }
+    }
+
+    function updateProgressPercentage(percentage) {
+        const step3 = elements.steps[2];
+        if (step3 && percentage > 0) {
+            let percentSpan = step3.querySelector('.progress-percent');
+            if (!percentSpan) {
+                percentSpan = document.createElement('span');
+                percentSpan.className = 'progress-percent';
+                percentSpan.style.marginLeft = '5px';
+                step3.appendChild(percentSpan);
+            }
+            percentSpan.textContent = `(${percentage}%)`;
+            step3.style.setProperty('--progress', `${percentage}%`);
         }
     }
 
@@ -132,8 +183,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentFile) return;
 
         toggleView('analyzing');
-        questionsContainer.innerHTML = '';
-        allResults = []; // Reset results for new analysis
+        elements.questionsContainer.innerHTML = '';
+        allResults = [];
         updateProgress(0);
 
         const formData = new FormData();
@@ -153,31 +204,27 @@ document.addEventListener('DOMContentLoaded', () => {
             // Completion state
             updateProgress(3);
             setTimeout(() => {
-                // Show download button if we have results
                 if (allResults.length > 0) {
                     createDownloadButton();
                 }
 
-                analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
-                analyzeBtn.classList.remove('hidden');
-                loadingSection.classList.add('hidden');
+                elements.analyzeBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Analyze Another Resume';
+                elements.analyzeBtn.classList.remove('hidden');
+                elements.loadingSection.classList.add('hidden');
 
-                // Fix: Properly handle button reset
-                // Remove the old 'click' listener to prevent re-submitting immediately if clicked
-                analyzeBtn.removeEventListener('click', startAnalysis);
-
-                // Add new listener for reload
-                analyzeBtn.onclick = () => window.location.reload();
+                elements.analyzeBtn.removeEventListener('click', startAnalysis);
+                elements.analyzeBtn.onclick = () => window.location.reload();
             }, 500);
 
         } catch (error) {
             console.error('Error:', error);
             alert('An error occurred. Please try again.');
-            loadingSection.classList.add('hidden');
-            analyzeBtn.classList.remove('hidden');
+            elements.loadingSection.classList.add('hidden');
+            elements.analyzeBtn.classList.remove('hidden');
         }
     }
 
+    // --- 4. Stream Processing (Refactor) ---
     async function readStream(reader) {
         const decoder = new TextDecoder();
         let buffer = '';
@@ -187,104 +234,50 @@ document.addEventListener('DOMContentLoaded', () => {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // Keep incomplete line
 
-            for (const line of lines) {
-                if (line.trim()) {
-                    try {
-                        const data = JSON.parse(line);
-                        appendResult(data);
-                    } catch (e) {
-                        console.error('JSON Parse Error:', e);
-                    }
+            // Safe buffering: split lines, keep the last incomplete chunk
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            processLines(lines);
+        }
+
+        // Process any remaining buffer
+        if (buffer && buffer.trim()) {
+            processLines([buffer]);
+        }
+    }
+
+    function processLines(lines) {
+        for (const line of lines) {
+            if (line.trim()) {
+                try {
+                    const data = JSON.parse(line);
+                    appendResult(data);
+                } catch (e) {
+                    console.error('JSON Parse Error:', e);
                 }
             }
         }
     }
 
-    function updateProgress(step) {
-        document.querySelectorAll('.step').forEach((el, index) => {
-            if (index + 1 < step) {
-                el.classList.add('completed');
-                el.classList.remove('active');
-            } else if (index + 1 === step) {
-                el.classList.add('active');
-                el.classList.remove('completed');
-            } else {
-                el.classList.remove('active', 'completed');
-            }
-        });
-
-        const texts = [
-            "Extracting Skills from Resume...",
-            "Discovering Technical Sources...",
-            "Generating Interview Questions..."
-        ];
-        if (step > 0) {
-            loadingText.textContent = texts[step - 1];
-        } else {
-            loadingText.textContent = "Starting analysis...";
-        }
-    }
-
-    function updateProgressPercentage(percentage) {
-        // Update step 3 indicator with percentage
-        const step3 = document.querySelectorAll('.step')[2];
-        if (step3 && percentage > 0) {
-            // Preserve the icon and text, just append/update percentage
-            // We assume the original HTML is something like <i class="..."></i> Generating Questions
-            // We want: <i class="..."></i> Generating Questions (50%)
-
-            // Check if we already added a percentage span
-            let percentSpan = step3.querySelector('.progress-percent');
-            if (!percentSpan) {
-                percentSpan = document.createElement('span');
-                percentSpan.className = 'progress-percent';
-                percentSpan.style.marginLeft = '5px';
-                step3.appendChild(percentSpan);
-            }
-            percentSpan.textContent = `(${percentage}%)`;
-
-            step3.style.setProperty('--progress', `${percentage}%`);
-        }
-    }
-
+    // --- 5. Result Handling & Errors (Refactor) ---
     function appendResult(item) {
-        // Show results section when the first data arrives
-        if (resultsSection.classList.contains('hidden')) {
-            loadingSection.classList.add('hidden');
-            resultsSection.classList.remove('hidden');
-            analyzeBtn.classList.remove('hidden');
-        }
-
-        // Handle quota exhaustion errors with distinct UI banner
-        // Backend sends: {type: "quota_error", content: {error_type: "QuotaExhausted", user_message: "..."}}
-        if (item.type === 'quota_error') {
-            const userMessage = item.content?.user_message || item.content?.error || 'LLM API quota exceeded. Please try again later.';
-            displayQuotaError(userMessage);
+        // Handle errors first
+        if (isQuotaError(item)) {
+            displayQuotaError(getQuotaErrorMessage(item));
             return;
         }
 
-        // Also handle legacy format for backwards compatibility
-        if (item.error_type && item.error_type.toLowerCase() === 'quota_exhausted') {
-            displayQuotaError(item.error || 'LLM API quota exceeded.');
-            return;
-        }
+        // Skip empty results
+        if (!item.questions || item.questions.length === 0) return;
 
-        // Fix: Only render card if there are valid questions
-        if (!item.questions || item.questions.length === 0) {
-            console.warn(`Skipping display for skill '${item.skill}': No questions generated.`);
-            return;
-        }
+        allResults.push(item);
+        displayResult(item);
+    }
 
-
-        // Store result for download
-        allResults.push({
-            skill: item.skill,
-            questions: item.questions
-        });
-
+    function displayResult(item) {
+        // Create skill card structure that matches CSS
         const card = document.createElement('div');
         card.className = 'skill-card';
         card.style.animation = 'slideUp 0.5s ease backwards';
@@ -304,24 +297,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="fa-solid fa-chevron-down skill-toggle-icon"></i>
             </div>
             <div class="skill-content">
-                <ul class="question-list">
-                    ${questionsHtml}
-                </ul>
+                <ul class="question-list">${questionsHtml}</ul>
             </div>
         `;
 
-        // Add accordion toggle functionality
-        const header = card.querySelector('.skill-header');
-        header.addEventListener('click', () => {
+        // Add accordion toggle
+        card.querySelector('.skill-header').addEventListener('click', () => {
             card.classList.toggle('active');
         });
 
-        questionsContainer.appendChild(card);
+        elements.questionsContainer.appendChild(card);
 
-        // Auto-open the first result to show user what's happening
-        if (questionsContainer.children.length === 1) {
-            setTimeout(() => card.classList.add('active'), 100);
+        // Show results section if it was hidden
+        if (elements.resultsSection.classList.contains('hidden')) {
+            elements.resultsSection.classList.remove('hidden');
         }
+    }
+
+    function isQuotaError(item) {
+        return (
+            item.type === 'quota_error' ||
+            item.error_type === 'QuotaExhausted' ||
+            item.error_type === 'quota_exhausted' ||
+            (item.error && item.error.toLowerCase().includes('quota'))
+        );
+    }
+
+    function getQuotaErrorMessage(item) {
+        return item.error || 'Quota exceeded. Please try again later.';
     }
 
     function displayQuotaError(message) {
@@ -337,69 +340,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>${message}</p>
             </div>
         `;
-        questionsContainer.prepend(errorDiv);
-
-        // Log for debugging
+        elements.questionsContainer.prepend(errorDiv);
         console.warn('Quota error displayed:', message);
+
+        // Show results section if it was hidden
+        if (elements.resultsSection.classList.contains('hidden')) {
+            elements.resultsSection.classList.remove('hidden');
+        }
     }
 
     function createDownloadButton() {
-        // Check if button already exists
-        if (document.getElementById('download-btn')) return;
-
         const downloadBtn = document.createElement('button');
-        downloadBtn.id = 'download-btn';
-        downloadBtn.className = 'btn btn-secondary';
-        downloadBtn.innerHTML = '<i class="fa-solid fa-download"></i> Download Results (TXT)';
-        downloadBtn.style.marginLeft = '10px';
+        downloadBtn.className = 'download-btn';
+        downloadBtn.innerHTML = '<i class="fa-solid fa-download"></i> Download Results';
+        downloadBtn.addEventListener('click', downloadResults);
 
-        downloadBtn.addEventListener('click', async () => {
-            try {
-                const filename = currentFile ? currentFile.name.replace('.pdf', '') : 'resume';
+        elements.resultsSection.appendChild(downloadBtn);
+    }
 
-                const response = await fetch('/api/v1/download-results', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        results: allResults,
-                        filename: filename
-                    })
-                });
+    function downloadResults() {
+        if (!allResults || allResults.length === 0) {
+            alert('No results to download');
+            return;
+        }
 
-                if (!response.ok) throw new Error('Download failed');
+        // Format the results properly with skill sections
+        const resultsText = allResults.map(item => {
+            const skillSection = `${'='.repeat(60)}\nSKILL: ${item.skill}\n${'='.repeat(60)}\n\n`;
+            const questions = item.questions.map((q, i) =>
+                `${i + 1}. ${q}`
+            ).join('\n\n');
+            return skillSection + questions + '\n\n';
+        }).join('\n');
 
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
+        const header = `AI INTERVIEW PREP - GENERATED QUESTIONS\n` +
+            `Generated: ${new Date().toLocaleString()}\n` +
+            `Total Skills: ${allResults.length}\n` +
+            `${'='.repeat(60)}\n\n`;
 
-                // Get filename from Content-Disposition header or generate one
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let downloadFilename = `${filename}_results.txt`;
+        const fullText = header + resultsText;
 
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename="(.+)"/i);
-                    if (filenameMatch) {
-                        downloadFilename = filenameMatch[1];
-                    }
-                }
-
-                a.download = downloadFilename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-
-                console.log('Download complete:', downloadFilename);
-            } catch (error) {
-                console.error('Download error:', error);
-                alert('Failed to download results. Please try again.');
-            }
-        });
-
-        // Insert button next to the analyze button
-        analyzeBtn.parentNode.insertBefore(downloadBtn, analyzeBtn.nextSibling);
+        const blob = new Blob([fullText], { type: 'text/plain; charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `interview-questions-${new Date().toISOString().slice(0, 10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 });

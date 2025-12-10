@@ -24,7 +24,7 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     padding: 2rem;
 }
 
@@ -329,18 +329,19 @@ h1 {
 }
 
 .skill-content {
-    max-height: 0;
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.4s ease-out;
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0, 1, 0, 1);
 }
 
 .skill-card.active .skill-content {
-    max-height: 2000px;
-    /* Arbitrary large height for smooth transition */
-    transition: max-height 0.4s ease-in-out;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.4s ease-in-out;
 }
 
 .question-list {
+    min-height: 0;
     list-style: none;
     padding: 0 1.5rem 1.5rem 1.5rem;
     margin: 0;
@@ -409,6 +410,40 @@ h1 {
     color: var(--text-muted);
     line-height: 1.5;
     margin: 0;
+}
+
+/* Progress percentage styling */
+.progress-percent {
+    margin-left: 5px;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* Download button styling */
+.download-btn {
+    background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+    color: white;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -10px rgba(99, 102, 241, 0.5);
+}
+
+.download-btn i {
+    color: white;
 }
 
 /* Utilities */

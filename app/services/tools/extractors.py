@@ -8,13 +8,8 @@ import logging
 from pathlib import Path
 from typing import List, Dict
 
-# Third-Party Imports
-from langchain_community.document_loaders import PyPDFLoader
-
-
-# Application-Specific Imports
-from app.services.tools.source_discovery import discover_sources
-
+# Third-Party Imports - using pypdf instead of PyPDFLoader for better performance
+import pypdf
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def file_text_extractor(file_path: str) -> str:
     """
-    Extracts all text content from a PDF file using LangChain's PyPDFLoader.
+    Extracts all text content from a PDF file using pypdf (fast and lightweight).
 
     Args:
         file_path: The path to the PDF file.
@@ -44,15 +39,15 @@ def file_text_extractor(file_path: str) -> str:
             logger.warning(f"Unsupported file type: {path_obj.suffix}. Only PDF files are supported.")
             return f"Unsupported file type: {path_obj.suffix}. Only PDF files are supported."
 
-        # Use LangChain's PyPDFLoader for robust PDF extraction
-        # Use native Windows path format (PyPDFLoader handles it correctly)
-        loader = PyPDFLoader(str(path_obj))
-        documents = loader.load()
+        # Use pypdf for fast PDF extraction (much faster than PyPDFLoader)
+        with open(path_obj, 'rb') as file:
+            reader = pypdf.PdfReader(file)
+            
+            # Extract text from all pages (list comprehension for better performance)
+            text_parts = [page.extract_text() for page in reader.pages]
+            text = "\n".join(text_parts)
         
-        # Combine all pages' content
-        text = "\n".join(doc.page_content for doc in documents)
-        
-        logger.info(f"Successfully extracted {len(text)} characters from {len(documents)} pages in {file_path}")
+        logger.info(f"Successfully extracted {len(text)} characters from {len(reader.pages)} pages in {file_path}")
         return text if text else "Error: No text could be extracted from the PDF."
 
     except FileNotFoundError:
@@ -64,8 +59,3 @@ def file_text_extractor(file_path: str) -> str:
     except Exception as e:
         logger.error(f"Unexpected error in file_text_extractor for {file_path}: {e}", exc_info=True)
         return f"An error occurred while reading the PDF: {str(e)}"
-
-
-
-
-
