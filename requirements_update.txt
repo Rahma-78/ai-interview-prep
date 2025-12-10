@@ -1,2 +1,0 @@
-# Add pypdf to replace slow PyPDFLoader
-pypdf
