@@ -1,3 +1,4 @@
+![pipeline_flow](https://github.com/user-attachments/assets/94cfd290-3891-495e-beb9-f8d1d03ff844)
 # 🎯 AI Interview Prep
 
 > **AI-powered technical interview preparation system** that analyzes resumes, discovers authoritative sources, and generates deep technical questions using state-of-the-art LLMs.
