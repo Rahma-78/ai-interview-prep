@@ -58,3 +58,5 @@ test_*
 
 # HuggingFace specific
 __pycache__/
+#image
+.png

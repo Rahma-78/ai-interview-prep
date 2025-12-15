@@ -1,18 +1,25 @@
-# fastapi - Web framework
+# Web Framework
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
+jinja2
 
 # LLM Providers
 langchain_groq
-langchain_openai
 langchain_community
-google-generativeai
+google-genai
+google-api-core
 
 # Utilities
 python-dotenv
-json_repair
-pypdf
-httpx
-tenacity
 pydantic-settings
+
+# File Processing
+pypdf
+orjson
+
+# HTTP Client
+httpx
+
+# Async Support
+anyio

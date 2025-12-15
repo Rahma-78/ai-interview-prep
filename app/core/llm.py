@@ -19,7 +19,7 @@ from langchain_groq import ChatGroq
 
 # ChatGroq - For skill extraction (fast, precise skill identification)
 chat_groq_skill_extraction = ChatGroq(
-    model="meta-llama/llama-4-maverick-17b-128e-instruct",
+    model="openai/gpt-oss-20b",
     temperature=0.2,
     api_key=settings.GROQ_API_KEY,
 )

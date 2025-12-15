@@ -4,6 +4,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%96%20Hugging%20Face-Spaces-yellow.svg)](https://huggingface.co/spaces/Rahma07/AI-questions-gen)
 
 
 ---
@@ -65,7 +66,7 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 ### Pipeline Architecture Flow
 
 <div align="center">
-  <img src="app/static/pipeline_flow.png" alt="AI Interview Prep Pipeline Architecture" width="100%">
+  <img src="pipeline_flow.png" alt="AI Interview Prep Pipeline Architecture" width="100%">
 </div>
 
 <br>
@@ -92,7 +93,7 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
   - Fast-fail on quota exhaustion (no retries on 429 RESOURCE_EXHAUSTED)
   - Unified retry logic for transient errors (503, 502, rate limits)
   - Fallback to context-free generation when source discovery fails
-- **⏱️ Rate Limiting**: Service-specific limits (Gemini: 15 RPM)
+- **⏱️ Rate Limiting**: Service-specific limits (Gemini: 5 RPM, Groq: 60 RPM)
 - **💾 On-Demand Downloads**: Export results to formatted TXT report
 
 ---
@@ -107,7 +108,6 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 ### LLM Providers
 - **LangChain** - LLM abstraction layer
   - `langchain_groq` - Groq integration (supports both LLaMA and GPT-OSS models)
-  - `langchain_community` - Document loaders
 - **Google GenAI SDK** - Gemini with search grounding
 
 ---
@@ -158,24 +158,6 @@ Create a `.env` file in the project root:
 # LLM Provider API Keys
 GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
-
-# Rate Limits (Requests Per Minute)
-GEMINI_RPM=15   # Conservative limit for free tier
-
-
-# Pipeline Configuration
-SKILL_COUNT=9        # Number of skills to extract
-BATCH_SIZE=3         # Skills per batch
-MAX_CONCURRENT_BATCHES=3
-
-# Protection
-SAFE_TOKEN_LIMIT=50000  # Max tokens before batch splitting
-MAX_FILE_SIZE_MB=10     # Max resume size
-
-# Retry Configuration
-RETRY_MAX_ATTEMPTS=3
-RETRY_BASE_DELAY=1.0
-RETRY_MAX_DELAY=60.0
 ```
 
 ### Customization
@@ -185,6 +167,7 @@ RETRY_MAX_DELAY=60.0
 | `SKILL_COUNT` | 9 | Number of skills to extract from resume |
 | `BATCH_SIZE` | 3 | Skills per batch (affects parallelism) |
 | `MAX_CONCURRENT_BATCHES` | 3 | Max parallel processing pipelines |
+| `SOURCE_DISCOVERY_CONCURRENCY` | 3 | Concurrent source discovery requests |
 | `SAFE_TOKEN_LIMIT` | 50000 | Max tokens allowed before recursive batch splitting |
 | `MAX_FILE_SIZE_MB` | 10 | Max upload size in megabytes |
 
@@ -192,7 +175,13 @@ RETRY_MAX_DELAY=60.0
 
 ## 🚀 Usage
 
-### Start the Server
+### Try the Live Demo
+
+Experience the application running live on Hugging Face Spaces:
+
+👉 **[AI Interview Prep Demo](https://huggingface.co/spaces/Rahma07/AI-questions-gen)**
+
+### Start the Server Locally
 
 ```bash
 cd ai-interview-prep
