@@ -1,4 +1,3 @@
-![pipeline_flow](https://github.com/user-attachments/assets/94cfd290-3891-495e-beb9-f8d1d03ff844)
 # 🎯 AI Interview Prep
 
 > **AI-powered technical interview preparation system** that analyzes resumes, discovers authoritative sources, and generates deep technical questions using state-of-the-art LLMs.
@@ -67,7 +66,7 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 ### Pipeline Architecture Flow
 
 <div align="center">
-  <img src="pipeline_flow.png" alt="AI Interview Prep Pipeline Architecture" width="100%">
+![pipeline_flow](https://github.com/user-attachments/assets/94cfd290-3891-495e-beb9-f8d1d03ff844)
 </div>
 
 <br>
