@@ -65,11 +65,8 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 
 ### Pipeline Architecture Flow
 
-<div align="center">
 ![pipeline_flow](https://github.com/user-attachments/assets/94cfd290-3891-495e-beb9-f8d1d03ff844)
-</div>
 
-<br>
 
 ### Pipeline Stages Breakdown
 
