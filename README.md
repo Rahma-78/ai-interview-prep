@@ -32,7 +32,8 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 3. **Generate** insightful interview questions based on real-world context
 
 ---
-### Try the Live Demo
+
+## 🚀 Live Demo
 
 Experience the application running live on Hugging Face Spaces:
 
