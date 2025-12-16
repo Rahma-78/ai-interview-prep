@@ -17,7 +17,6 @@
 - [Tech Stack](#-tech-stack)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
-- [Usage](#-usage)
 - [API Documentation](#-api-documentation)
 - [Project Structure](#-project-structure)
 - [Development](#-development)
@@ -33,6 +32,11 @@ AI Interview Prep is an intelligent system that transforms resume PDFs into comp
 3. **Generate** insightful interview questions based on real-world context
 
 ---
+### Try the Live Demo
+
+Experience the application running live on Hugging Face Spaces:
+
+👉 **[AI Interview Prep Demo](https://huggingface.co/spaces/Rahma07/AI-questions-gen)**
 
 ## ✨ Features
 
@@ -170,13 +174,6 @@ GEMINI_API_KEY=your_gemini_api_key
 
 ---
 
-## 🚀 Usage
-
-### Try the Live Demo
-
-Experience the application running live on Hugging Face Spaces:
-
-👉 **[AI Interview Prep Demo](https://huggingface.co/spaces/Rahma07/AI-questions-gen)**
 
 ### Start the Server Locally
 
